@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perp Scanner</title>
+<style>
+  :root {
+    --bg:#0d0f14; --surface:#13161e; --surface2:#1a1e28; --border:#232736;
+    --accent:#4f8ef7; --accent2:#a78bfa; --green:#22c55e; --red:#ef4444;
+    --text:#e2e8f0; --muted:#64748b; --tag:#1e2435;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',sans-serif;font-size:13px;min-height:100vh}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+  .logo{font-size:15px;font-weight:700;letter-spacing:.04em;color:var(--accent)}
+  .logo span{color:var(--text)}
+  .hr{display:flex;align-items:center;gap:10px}
+  .upd{color:var(--muted);font-size:11px}
+  .btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;transition:all .15s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btnp{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .btnp:hover{opacity:.85;color:#fff}
+  .controls{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .cl{font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap}
+  .sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
+  .sw{position:relative}
+  .sw input{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px 6px 28px;border-radius:6px;font-size:12px;width:150px;outline:none;transition:border .15s}
+  .sw input:focus{border-color:var(--accent)}
+  .si{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px}
+  .tg{display:flex;gap:5px;flex-wrap:wrap}
+  .t{background:var(--tag);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:20px;cursor:pointer;font-size:11px;font-weight:500;transition:all .15s;user-select:none}
+  .t.on{background:#1e3a5f;border-color:var(--accent);color:var(--accent)}
+  .t.iv{background:#2a1f4f;border-color:var(--accent2);color:var(--accent2)}
+  .sbar{display:flex;gap:20px;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);flex-wrap:wrap}
+  .sbar span{color:var(--text);font-weight:600}
+  .tw{overflow-x:auto;padding:16px 20px}
+  table{width:100%;border-collapse:collapse;min-width:500px}
+  thead tr.grp th{padding:6px 12px 2px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:none;text-align:center;cursor:default}
+  thead tr.grp th.g-oi{color:var(--accent);border-top:2px solid var(--accent)}
+  thead tr.grp th.g-lsr{color:var(--accent2);border-top:2px solid var(--accent2)}
+  thead tr.sub th{padding:4px 12px 8px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;text-align:right}
+  thead tr.sub th:first-child{text-align:left}
+  thead tr.sub th:hover{color:var(--text)}
+  thead tr.sub th .si2{margin-left:3px;opacity:.3;font-size:10px}
+  thead tr.sub th.sa .si2::after{content:'▲';opacity:1}
+  thead tr.sub th.sd .si2::after{content:'▼';opacity:1}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+  tbody tr:hover{background:var(--surface2)}
+  td{padding:9px 12px;white-space:nowrap;text-align:right}
+  td:first-child{text-align:left}
+  .sym{font-weight:700;font-size:13px}
+  .sym .base{color:var(--accent)}
+  .sym .q{color:var(--muted);font-weight:400;font-size:11px}
+  .num{font-variant-numeric:tabular-nums;font-family:'JetBrains Mono','Fira Code',monospace}
+  .pos{color:var(--green)} .neg{color:var(--red)} .neu{color:var(--muted)}
+  .fb{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600}
+  .fp{background:#14301e;color:var(--green)} .fn{background:#2d1515;color:var(--red)} .fz{background:var(--tag);color:var(--muted)}
+  .sr td{text-align:center;padding:60px;color:var(--muted);font-size:13px}
+  .spin{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .excount{font-size:10px;color:var(--muted);margin-left:4px}
+
+  /* ── ALERTAS ── */
+  .alert-btn{position:relative}
+  .alert-badge{position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;min-width:16px;text-align:center;display:none}
+  
+  .alert-panel{display:none;position:fixed;top:0;right:0;width:420px;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:200;flex-direction:column;box-shadow:-8px 0 32px rgba(0,0,0,.5)}
+  .alert-panel.open{display:flex}
+  .ap-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+  .ap-head h2{font-size:14px;font-weight:700;color:var(--text)}
+  .ap-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px}
+  .ap-close:hover{color:var(--text);background:var(--surface2)}
+  .ap-body{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+  .ap-footer{padding:12px 20px;border-top:1px solid var(--border)}
+  
+  .alert-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;position:relative}
+  .alert-card.active{border-color:rgba(79,142,247,.4);box-shadow:0 0 12px rgba(79,142,247,.15)}
+  .alert-card.triggered{border-color:rgba(239,68,68,.5);box-shadow:0 0 16px rgba(239,68,68,.2);animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 8px rgba(239,68,68,.2)}50%{box-shadow:0 0 20px rgba(239,68,68,.4)}}
+  .ac-head{display:flex;align-items:center;gap:8px}
+  .ac-name{flex:1;font-weight:600;font-size:13px;color:var(--text)}
+  .ac-toggle{width:36px;height:20px;background:var(--border);border-radius:10px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;border:none}
+  .ac-toggle.on{background:var(--accent)}
+  .ac-toggle::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s}
+  .ac-toggle.on::after{transform:translateX(16px)}
+  .ac-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px}
+  .ac-del:hover{color:var(--red);background:rgba(239,68,68,.1)}
+  .ac-conditions{display:flex;flex-direction:column;gap:6px}
+  .ac-cond{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);background:var(--tag);padding:4px 8px;border-radius:6px}
+  .ac-cond span{color:var(--text);font-weight:500}
+  .ac-triggered{font-size:11px;color:var(--red);font-weight:600;text-align:right}
+  
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:460px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border)}
+  .modal-head h3{font-size:15px;font-weight:700}
+  .modal-body{padding:20px;display:flex;flex-direction:column;gap:16px}
+  .modal-footer{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+  
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .field input,.field select{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;font-family:'Inter','Segoe UI',sans-serif;outline:none;width:100%;transition:border .2s}
+  .field input:focus,.field select:focus{border-color:var(--accent)}
+  .field select option{background:var(--surface2)}
+  
+  .cond-list{display:flex;flex-direction:column;gap:8px}
+  .cond-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center}
+  .cond-row select,.cond-row input{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:12px;font-family:'Inter','Segoe UI',sans-serif;outline:none;width:100%;transition:border .2s}
+  .cond-row select:focus,.cond-row input:focus{border-color:var(--accent)}
+  .cond-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px 8px;border-radius:6px}
+  .cond-del:hover{color:var(--red);background:rgba(239,68,68,.1)}
+  .add-cond{background:none;border:1px dashed var(--border);color:var(--muted);padding:8px;border-radius:8px;cursor:pointer;font-size:12px;font-family:'Inter','Segoe UI',sans-serif;transition:all .2s;width:100%}
+  .add-cond:hover{border-color:var(--accent);color:var(--accent)}
+
+  .toast-container{position:fixed;bottom:24px;right:24px;z-index:400;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  .toast{background:var(--surface);border:1px solid var(--red);border-radius:10px;padding:12px 16px;min-width:260px;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:all;animation:slideIn .3s ease;display:flex;flex-direction:column;gap:4px}
+  @keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+  .toast-title{font-weight:700;font-size:13px;color:var(--red)}
+  .toast-body{font-size:12px;color:var(--text)}
+  .toast-time{font-size:10px;color:var(--muted)}
+  
+  tr.alert-hit{background:rgba(239,68,68,.06)!important}
+  tr.alert-hit td:first-child{border-left:2px solid var(--red)!important}
+
+  /* ── FILTROS AVANÇADOS ── */
+  .fbar{display:flex;align-items:center;gap:10px;padding:8px 20px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .fbar-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+  .fbar-group{display:flex;align-items:center;gap:6px;background:var(--tag);border:1px solid var(--border);border-radius:8px;padding:4px 10px}
+  .fbar-group.active{border-color:var(--accent);background:rgba(79,142,247,.06)}
+  .fbar-group label{font-size:11px;color:var(--muted);white-space:nowrap;font-weight:600}
+  .fbar-group select,.fbar-group input{background:transparent;border:none;color:var(--text);font-size:12px;font-family:'Inter','Segoe UI',sans-serif;outline:none;cursor:pointer}
+  .fbar-group input{width:70px;border-bottom:1px solid var(--border)}
+  .fbar-group input:focus{border-bottom-color:var(--accent)}
+  .fbar-clear{background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-family:'Inter','Segoe UI',sans-serif;transition:all .15s}
+  .fbar-clear:hover{border-color:var(--red);color:var(--red)}
+
+  /* ── TV MENU ── */
+  .sym-wrap{position:relative;display:inline-block}
+  .tv-menu{display:none;position:absolute;top:100%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;z-index:500;min-width:140px;box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden}
+  .tv-menu.open{display:block}
+  .tv-menu a{display:block;padding:7px 14px;font-size:12px;color:var(--text);text-decoration:none;transition:background .15s;white-space:nowrap}
+  .tv-menu a:hover{background:var(--surface2);color:var(--accent)}
+  .tv-menu-title{padding:6px 14px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+
+  /* ── FAVORITOS ── */
+  .fav-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:0 4px;opacity:.3;transition:all .15s;line-height:1;text-shadow:0 0 1px #fff, 0 0 1px #fff}
+  .fav-btn.on{opacity:1;color:#fbbf24;text-shadow:0 0 2px #fbbf24}
+  .fav-btn:hover{opacity:.8;transform:scale(1.2)}
+  .t.fav-on{background:rgba(251,191,36,.1);border-color:#fbbf24;color:#fbbf24}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">PERP<span>SCAN</span></div>
+  <div class="hr">
+    <div class="upd" id="upd">Aguardando...</div>
+    <button class="btn alert-btn" id="alertBtn" onclick="toggleAlertPanel()">🔔 Alertas<span class="alert-badge" id="alertBadge"></span></button>
+    <button class="btn btnp" id="rfBtn" onclick="loadData()">↻ Atualizar</button>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="sw"><span class="si">🔍</span><input type="text" id="search" placeholder="Buscar token..." oninput="render()"></div>
+  <button class="t" id="favFilterBtn" onclick="toggleFavFilter()">⭐ Favoritos</button>
+  <div class="sep"></div>
+  <div class="cl">COLUNAS:</div>
+  <div class="tg" id="colTg"></div>
+  <div class="sep"></div>
+  <div class="cl">TIMEFRAMES (OI & LSR):</div>
+  <div class="tg" id="ivTg"></div>
+</div>
+
+<div class="fbar" id="filterBar">
+  <span class="fbar-label">Filtros:</span>
+
+  <div class="fbar-group" id="fg-volume">
+    <label>Volume</label>
+    <select id="fVolumeOp" onchange="applyAdvFilters()">
+      <option value="">--</option>
+      <option value="gt">&gt; maior</option>
+      <option value="lt">&lt; menor</option>
+    </select>
+    <input type="number" id="fVolumeVal" step="1" placeholder="ex: 100" onchange="applyAdvFilters()" oninput="applyAdvFilters()" style="width:60px">
+    <select id="fVolumeMult" onchange="applyAdvFilters()">
+      <option value="1000">K</option>
+      <option value="1000000" selected>M</option>
+      <option value="1000000000">B</option>
+    </select>
+  </div>
+
+  <div class="fbar-group" id="fg-funding">
+    <label>Funding</label>
+    <select id="fFundingOp" onchange="applyAdvFilters()">
+      <option value="">--</option>
+      <option value="gt">&gt; maior</option>
+      <option value="lt">&lt; menor</option>
+    </select>
+    <input type="number" id="fFundingVal" step="0.0001" placeholder="ex: -0.05" onchange="applyAdvFilters()" oninput="applyAdvFilters()">
+    <span style="font-size:11px;color:var(--muted)">%</span>
+  </div>
+
+  <div class="fbar-group" id="fg-oi">
+    <label>OI (conjunto)</label>
+    <select id="fOiDir" onchange="applyAdvFilters()">
+      <option value="">--</option>
+      <option value="up">↑ maioria subindo</option>
+      <option value="dn">↓ maioria caindo</option>
+      <option value="all_up">↑↑ todos subindo</option>
+      <option value="all_dn">↓↓ todos caindo</option>
+    </select>
+  </div>
+
+  <div class="fbar-group" id="fg-lsr">
+    <label>LSR (conjunto)</label>
+    <select id="fLsrDir" onchange="applyAdvFilters()">
+      <option value="">--</option>
+      <option value="up">↑ maioria subindo</option>
+      <option value="dn">↓ maioria caindo</option>
+      <option value="all_up">↑↑ todos subindo</option>
+      <option value="all_dn">↓↓ todos caindo</option>
+    </select>
+  </div>
+
+  <button class="fbar-clear" onclick="clearAdvFilters()">✕ Limpar</button>
+</div>
+
+<div class="sbar">
+  <div>Tokens: <span id="sT">—</span></div>
+  <div>Funding + (avg): <span id="sFp" style="color:var(--green)">—</span></div>
+  <div>Funding − (avg): <span id="sFn" style="color:var(--red)">—</span></div>
+  <div id="exStatus" style="color:var(--muted)"></div>
+</div>
+
+<div class="tw"><table id="tbl"><thead id="th"></thead><tbody id="tb"><tr class="sr"><td colspan="20"><span class="spin"></span>Carregando dados...</td></tr></tbody></table></div>
+
+<script>
+const INTERVALS = [{id:'5m',l:'5m'},{id:'15m',l:'15m'},{id:'1h',l:'1h'},{id:'4h',l:'4h'},{id:'1d',l:'1D'}];
+
+const FIXED_COLS = [
+  {id:'symbol',  label:'Token',    always:true},
+  {id:'price',   label:'Preço',    always:true},
+  {id:'volume',  label:'Volume'},
+  {id:'trades',  label:'Trades'},
+  {id:'funding', label:'Funding Avg'},
+];
+
+const SK = 'ps_v5';
+const DEF_COLS = ['volume','trades','funding'];
+const DEF_IVS  = ['5m','15m','1h'];
+
+let activeCols = [...DEF_COLS];
+let activeIVs  = [...DEF_IVS];
+let sortCol    = 'volume';
+let sortDir    = 'desc';
+let allData    = [];
+let filteredData = [];
+let advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'' };
+let favorites = JSON.parse(localStorage.getItem('perpFavorites')||'[]');
+let showFavOnly = false;
+
+function saveFavorites(){ localStorage.setItem('perpFavorites', JSON.stringify(favorites)); }
+
+function toggleFav(sym, e){
+  e.stopPropagation();
+  if(favorites.includes(sym)){
+    favorites = favorites.filter(s=>s!==sym);
+  } else {
+    favorites.push(sym);
+  }
+  saveFavorites();
+  render();
+}
+
+function toggleFavFilter(){
+  showFavOnly = !showFavOnly;
+  const btn = document.getElementById('favFilterBtn');
+  btn.classList.toggle('fav-on', showFavOnly);
+  btn.textContent = showFavOnly ? '⭐ Favoritos ✕' : '⭐ Favoritos';
+  render();
+}
+
+function applyAdvFilters(){
+  advFilters.volumeOp   = document.getElementById('fVolumeOp').value;
+  advFilters.volumeVal  = document.getElementById('fVolumeVal').value;
+  advFilters.volumeMult = document.getElementById('fVolumeMult').value;
+  advFilters.fundingOp  = document.getElementById('fFundingOp').value;
+  advFilters.fundingVal = document.getElementById('fFundingVal').value;
+  advFilters.oiDir      = document.getElementById('fOiDir').value;
+  advFilters.lsrDir     = document.getElementById('fLsrDir').value;
+  
+  // Destaca grupos ativos
+  document.getElementById('fg-volume').classList.toggle('active', !!(advFilters.volumeOp && advFilters.volumeVal!==''));
+  document.getElementById('fg-funding').classList.toggle('active', !!(advFilters.fundingOp && advFilters.fundingVal!==''));
+  document.getElementById('fg-oi').classList.toggle('active', !!advFilters.oiDir);
+  document.getElementById('fg-lsr').classList.toggle('active', !!advFilters.lsrDir);
+  
+  render();
+}
+
+function clearAdvFilters(){
+  document.getElementById('fVolumeOp').value='';
+  document.getElementById('fVolumeVal').value='';
+  document.getElementById('fVolumeMult').value='1000000';
+  document.getElementById('fFundingOp').value='';
+  document.getElementById('fFundingVal').value='';
+  document.getElementById('fOiDir').value='';
+  document.getElementById('fLsrDir').value='';
+  advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'' };
+  document.getElementById('fg-volume').classList.remove('active');
+  document.getElementById('fg-funding').classList.remove('active');
+  document.getElementById('fg-oi').classList.remove('active');
+  document.getElementById('fg-lsr').classList.remove('active');
+  render();
+}
+
+function passAdvFilter(d){
+  const ivs = ['5m','15m','1h','4h','1d'];
+  
+  // Funding filter
+  if(advFilters.volumeOp && advFilters.volumeVal!==''){
+    const v = d.volume;
+    const mult = parseFloat(advFilters.volumeMult || 1000000);
+    const threshold = parseFloat(advFilters.volumeVal) * mult;
+    if(v==null) return false;
+    if(advFilters.volumeOp==='gt' && !(v > threshold)) return false;
+    if(advFilters.volumeOp==='lt' && !(v < threshold)) return false;
+  }
+
+  if(advFilters.fundingOp && advFilters.fundingVal!==''){
+    const v = getAvgFunding(d.symbol);
+    const threshold = parseFloat(advFilters.fundingVal);
+    if(v==null) return false;
+    if(advFilters.fundingOp==='gt' && !(v > threshold)) return false;
+    if(advFilters.fundingOp==='lt' && !(v < threshold)) return false;
+  }
+  
+  // OI direction filter (conjunto dos timeframes ativos)
+  if(advFilters.oiDir){
+    const activeIvsNow = ivs.filter(iv => activeIVs.includes(iv));
+    const results = activeIvsNow.map(iv=>{
+      const cur  = cache[`${d._sym}_oi_${iv}`];
+      const prev = cache[`${d._sym}_oi_${iv}_prev`];
+      if(cur==null||prev==null) return null;
+      return cur > prev ? 'up' : cur < prev ? 'dn' : 'flat';
+    }).filter(r=>r!==null);
+    
+    if(results.length===0) return false;
+    const ups = results.filter(r=>r==='up').length;
+    const dns = results.filter(r=>r==='dn').length;
+    const total = results.length;
+    
+    if(advFilters.oiDir==='up'     && !(ups > total/2)) return false;
+    if(advFilters.oiDir==='dn'     && !(dns > total/2)) return false;
+    if(advFilters.oiDir==='all_up' && !(ups === total)) return false;
+    if(advFilters.oiDir==='all_dn' && !(dns === total)) return false;
+  }
+  
+  // LSR filter (direção do conjunto dos timeframes ativos)
+  if(advFilters.lsrDir){
+    const activeIvsNow = ivs.filter(iv => activeIVs.includes(iv));
+    const results = activeIvsNow.map(iv=>{
+      const cur  = cache[`${d._sym}_lsr_${iv}`];
+      const prev = cache[`${d._sym}_lsr_${iv}_prev`];
+      if(cur==null||prev==null) return null;
+      return cur > prev ? 'up' : cur < prev ? 'dn' : 'flat';
+    }).filter(r=>r!==null);
+    
+    if(results.length===0) return false;
+    const ups = results.filter(r=>r==='up').length;
+    const dns = results.filter(r=>r==='dn').length;
+    const total = results.length;
+    
+    if(advFilters.lsrDir==='up'     && !(ups > total/2)) return false;
+    if(advFilters.lsrDir==='dn'     && !(dns > total/2)) return false;
+    if(advFilters.lsrDir==='all_up' && !(ups === total)) return false;
+    if(advFilters.lsrDir==='all_dn' && !(dns === total)) return false;
+  }
+  
+  return true;
+}
+let cache      = {}; 
+let exLoaded   = {};
+
+function saveC(){ try{localStorage.setItem(SK,JSON.stringify({activeCols,activeIVs,sortCol,sortDir}))}catch(e){} }
+function loadC(){
+  try{
+    const c=JSON.parse(localStorage.getItem(SK)||'{}');
+    activeCols=c.activeCols||[...DEF_COLS];
+    activeIVs =c.activeIVs ||[...DEF_IVS];
+    sortCol   =c.sortCol   ||'volume';
+    sortDir   =c.sortDir   ||'desc';
+  }catch(e){}
+}
+
+const fj = (url, timeout=8000) => {
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort(), timeout);
+  return fetch(url, {signal:ctrl.signal})
+    .then(r=>{ clearTimeout(t); if(!r.ok) throw r.status; return r.json(); })
+    .catch(e=>{ clearTimeout(t); throw e; });
+};
+
+function fmtP(n){
+  if(n==null||isNaN(n)) return '—';
+  if(n>=1000) return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(n>=1) return n.toFixed(4);
+  if(n>=0.01) return n.toFixed(5);
+  return n.toFixed(8);
+}
+function fmtK(n){
+  if(n==null||isNaN(n)) return '—';
+  const a=Math.abs(n);
+  if(a>=1e9) return (n/1e9).toFixed(2)+'B';
+  if(a>=1e6) return (n/1e6).toFixed(2)+'M';
+  if(a>=1e3) return (n/1e3).toFixed(2)+'K';
+  return n.toFixed(2);
+}
+function fmt(n,d=3){ return n==null||isNaN(n)?'—':Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+
+let fundingMap = {};
+
+async function fetchAllFunding(){
+  exLoaded = {};
+  const results = await Promise.allSettled([
+    fetchFundingBinance(),
+    fetchFundingBybit(),
+    fetchFundingOKX(),
+    fetchFundingGate(),
+    fetchFundingBitget(),
+    fetchFundingMEXC(),
+    fetchFundingHTX(),
+    fetchFundingBingX(),
+    fetchFundingKuCoin(),
+  ]);
+  const exNames = ['Binance','Bybit','OKX','Gate','Bitget','MEXC','HTX','BingX','KuCoin'];
+  results.forEach((r,i)=>{ exLoaded[exNames[i]] = r.status==='fulfilled'; });
+  const loaded = exNames.filter((_,i)=>results[i].status==='fulfilled');
+  document.getElementById('exStatus').textContent = `Exchanges: ${loaded.join(', ')}`;
+}
+
+function setFunding(token, exchange, rate, intervalHours=8){
+  if(!fundingMap[token]) fundingMap[token]={};
+  fundingMap[token][exchange] = rate;
+}
+
+function getAvgFunding(token){
+  const ex = fundingMap[token];
+  if(!ex) return null;
+  const vals = Object.values(ex).filter(v=>v!==null&&!isNaN(v));
+  if(!vals.length) return null;
+  return vals.reduce((a,b)=>a+b,0)/vals.length;
+}
+
+// Proxy para exchanges com CORS restrito
+// allorigins retorna {contents: "..."} então precisamos parsear
+const pj = async (url) => {
+  const proxy = 'https://api.allorigins.win/get?url=' + encodeURIComponent(url);
+  const res = await fj(proxy);
+  if(res && res.contents) return JSON.parse(res.contents);
+  throw new Error('proxy empty');
+};
+
+async function fetchFundingBinance(){
+  const data = await fj('https://fapi.binance.com/fapi/v1/premiumIndex');
+  let count = 0;
+  for(const d of data){
+    if(d.symbol.endsWith('USDT')){
+      const token = d.symbol.replace('USDT','');
+      setFunding(token,'binance', parseFloat(d.lastFundingRate)*100);
+      count++;
+    }
+  }
+  console.log(`[Funding] Binance: ${count} tokens`);
+}
+
+async function fetchFundingBybit(){
+  const data = await fj('https://api.bybit.com/v5/market/tickers?category=linear');
+  let count = 0;
+  for(const d of data.result.list){
+    if(d.symbol.endsWith('USDT')){
+      const token = d.symbol.replace('USDT','');
+      setFunding(token,'bybit', parseFloat(d.fundingRate)*100);
+      count++;
+    }
+  }
+  console.log(`[Funding] Bybit: ${count} tokens`);
+}
+
+async function fetchFundingOKX(){
+  // OKX: funding-rate-summary aceita CORS direto
+  const t = await fj('https://www.okx.com/api/v5/public/funding-rate-summary?instType=SWAP');
+  let count = 0;
+  if(t.data){
+    for(const d of t.data){
+      if(d.instId && d.instId.endsWith('-USDT-SWAP')){
+        const token = d.instId.replace('-USDT-SWAP','');
+        const rate = d.fundingRate ?? d.nextFundingRate;
+        if(rate !== undefined){
+          setFunding(token,'okx', parseFloat(rate)*100);
+          count++;
+        }
+      }
+    }
+  }
+  console.log(`[Funding] OKX: ${count} tokens`);
+}
+
+async function fetchFundingGate(){
+  // Gate.io aceita CORS com header correto
+  const data = await fj('https://api.gateio.ws/api/v4/futures/usdt/contracts?limit=1000');
+  let count = 0;
+  if(Array.isArray(data)){
+    for(const d of data){
+      if(d.funding_rate!==undefined && d.name && d.name.endsWith('_USDT')){
+        const token = d.name.replace('_USDT','');
+        setFunding(token,'gate', parseFloat(d.funding_rate)*100);
+        count++;
+      }
+    }
+  }
+  console.log(`[Funding] Gate: ${count} tokens`);
+}
+
+async function fetchFundingBitget(){
+  // Busca tickers (funding rate) e contracts (interval) em paralelo
+  const [tickRes, contractRes] = await Promise.allSettled([
+    fj('https://api.bitget.com/api/v2/mix/market/tickers?productType=USDT-FUTURES'),
+    fj('https://api.bitget.com/api/v2/mix/market/contracts?productType=USDT-FUTURES'),
+  ]);
+  
+  // Monta mapa de intervalo por símbolo
+  const intervalMap = {};
+  if(contractRes.status==='fulfilled' && contractRes.value?.data){
+    for(const c of contractRes.value.data){
+      if(c.symbol && c.fundingInterval){
+        // fundingInterval vem em minutos na Bitget v2
+        intervalMap[c.symbol] = parseFloat(c.fundingInterval) / 60;
+      }
+    }
+  }
+  
+  let count = 0;
+  if(tickRes.status==='fulfilled' && tickRes.value?.data){
+    for(const d of tickRes.value.data){
+      if(d.symbol && d.fundingRate!==undefined){
+        const token = d.symbol.replace(/_?USDT$/,'');
+        const intervalHours = intervalMap[d.symbol] || 8;
+        setFunding(token,'bitget', parseFloat(d.fundingRate)*100, intervalHours);
+        count++;
+      }
+    }
+  }
+  console.log(`[Funding] Bitget: ${count} tokens`);
+}
+
+async function fetchFundingMEXC(){
+  // MEXC endpoint alternativo
+  const data = await fj('https://contract.mexc.com/api/v1/contract/detail');
+  let count = 0;
+  if(data && data.data){
+    for(const d of data.data){
+      if(d.symbol && d.symbol.endsWith('_USDT') && d.fundingRate!==undefined){
+        const token = d.symbol.replace('_USDT','');
+        setFunding(token,'mexc', parseFloat(d.fundingRate)*100);
+        count++;
+      }
+    }
+  }
+  console.log(`[Funding] MEXC: ${count} tokens`);
+}
+
+async function fetchFundingHTX(){
+  // HTX endpoint direto sem proxy
+  const data = await fj('https://api.hbdm.com/linear-swap-api/v1/swap_batch_funding_rate');
+  let count = 0;
+  if(data && data.data){
+    for(const d of data.data){
+      if(d.contract_code && d.contract_code.endsWith('-USDT') && d.funding_rate!==undefined){
+        const token = d.contract_code.replace('-USDT','');
+        setFunding(token,'htx', parseFloat(d.funding_rate)*100);
+        count++;
+      }
+    }
+  }
+  console.log(`[Funding] HTX: ${count} tokens`);
+}
+
+async function fetchFundingBingX(){
+  const data = await fj('https://open-api.bingx.com/openApi/swap/v2/quote/premiumIndex?symbol=');
+  let count = 0;
+  if(data && data.data){
+    for(const d of data.data){
+      if(d.symbol && d.symbol.endsWith('-USDT') && d.lastFundingRate!==undefined){
+        const token = d.symbol.replace('-USDT','');
+        setFunding(token,'bingx', parseFloat(d.lastFundingRate)*100);
+        count++;
+      }
+    }
+  }
+  console.log(`[Funding] BingX: ${count} tokens`);
+}
+
+async function fetchFundingKuCoin(){
+  const data = await fj('https://api-futures.kucoin.com/api/v1/contracts/active');
+  let count = 0;
+  if(data.data){
+    for(const d of data.data){
+      if(d.symbol && d.symbol.endsWith('USDTM') && d.fundingFeeRate!==undefined){
+        const token = d.symbol.replace('USDTM','');
+        const norm = token === 'XBT' ? 'BTC' : token;
+        setFunding(norm,'kucoin', parseFloat(d.fundingFeeRate)*100);
+        count++;
+      }
+    }
+  }
+  console.log(`[Funding] KuCoin: ${count} tokens`);
+}
+
+async function loadData(){
+  document.getElementById('upd').textContent='Atualizando...';
+  document.getElementById('rfBtn').disabled=true;
+  document.getElementById('tb').innerHTML='<tr class="sr"><td colspan="20"><span class="spin"></span>Carregando dados...</td></tr>';
+
+  try{
+    const [tickers] = await Promise.all([
+      fj('https://fapi.binance.com/fapi/v1/ticker/24hr'),
+      fetchAllFunding(),
+    ]);
+
+    const sorted = tickers
+      .filter(t=>t.symbol.endsWith('USDT'))
+      .map(t=>({...t,_v:parseFloat(t.quoteVolume)}))
+      .sort((a,b)=>b._v-a._v);
+
+    allData = sorted.map(t=>({
+      symbol:  t.symbol.replace('USDT',''),
+      _sym:    t.symbol,
+      price:   parseFloat(t.lastPrice),
+      volume:  parseFloat(t.quoteVolume),
+      trades:  parseInt(t.count),
+    }));
+
+    // Primeiro render para montar a lista ordenada, depois enriquecer os 20 visíveis
+    render();
+    await enrichVisibleTop20();
+    render();
+    document.getElementById('upd').textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR');
+  }catch(e){
+    console.error(e);
+    document.getElementById('upd').textContent='Erro';
+    document.getElementById('tb').innerHTML='<tr class="sr"><td colspan="20">❌ Erro ao carregar dados.</td></tr>';
+  }
+  document.getElementById('rfBtn').disabled=false;
+}
+
+// Mapeia timeframe do scanner para o formato de cada exchange
+const IV_BYBIT_OI  = {'5m':'5min','15m':'15min','1h':'1h','4h':'4h','1d':'1d'};
+const IV_BYBIT_LSR = {'5m':'5min','15m':'15min','1h':'60min','4h':'240min','1d':'1d'};
+
+async function enrichAll(top, ivs){
+  for(const iv of ivs){
+    // ── Binance ──────────────────────────────────────────────────
+    const [bnOiRes, bnLsrRes] = await Promise.all([
+      Promise.allSettled(top.map(t=>fj(`https://fapi.binance.com/futures/data/openInterestHist?symbol=${t.symbol}&period=${iv}&limit=2`))),
+      Promise.allSettled(top.map(t=>fj(`https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${t.symbol}&period=${iv}&limit=2`))),
+    ]);
+
+    // ── Bybit ─────────────────────────────────────────────────────
+    const bybitIVoi  = IV_BYBIT_OI[iv]  || iv;
+    const bybitIVlsr = IV_BYBIT_LSR[iv] || iv;
+    const [bbOiRes, bbLsrRes] = await Promise.all([
+      Promise.allSettled(top.map(t=>fj(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${t.symbol}&intervalTime=${bybitIVoi}&limit=2`))),
+      Promise.allSettled(top.map(t=>fj(`https://api.bybit.com/v5/market/account-ratio?category=linear&symbol=${t.symbol}&period=${bybitIVlsr}&limit=2`))),
+    ]);
+
+    top.forEach((t,i)=>{
+      const sym = t.symbol;
+
+      // ── OI: soma Binance + Bybit ──
+      let oiCur = null, oiPrev = null;
+
+      const bnOi = bnOiRes[i];
+      if(bnOi.status==='fulfilled' && bnOi.value?.length>0){
+        const arr = bnOi.value;
+        oiCur  = parseFloat(arr[arr.length-1].sumOpenInterestValue);
+        oiPrev = arr.length>=2 ? parseFloat(arr[arr.length-2].sumOpenInterestValue) : null;
+      }
+
+      const bbOi = bbOiRes[i];
+      if(bbOi.status==='fulfilled' && bbOi.value?.result?.list?.length>0){
+        const arr = bbOi.value.result.list; // Bybit retorna do mais recente pro mais antigo
+        const bbCur  = parseFloat(arr[0].openInterest);
+        const bbPrev = arr.length>=2 ? parseFloat(arr[1].openInterest) : null;
+        // Bybit OI é em contratos (USD), soma direto
+        oiCur  = (oiCur  ?? 0) + bbCur;
+        if(oiPrev!=null && bbPrev!=null) oiPrev = oiPrev + bbPrev;
+        else if(bbPrev!=null) oiPrev = bbPrev;
+      }
+
+      if(oiCur!=null){
+        cache[`${sym}_oi_${iv}`]      = oiCur;
+        cache[`${sym}_oi_${iv}_prev`] = oiPrev;
+      }
+
+      // ── LSR: média Binance + Bybit ──
+      const lsrVals = {cur:[], prev:[]};
+
+      const bnLsr = bnLsrRes[i];
+      if(bnLsr.status==='fulfilled' && bnLsr.value?.length>0){
+        const arr = bnLsr.value;
+        lsrVals.cur.push(parseFloat(arr[arr.length-1].longShortRatio));
+        if(arr.length>=2) lsrVals.prev.push(parseFloat(arr[arr.length-2].longShortRatio));
+      }
+
+      const bbLsr = bbLsrRes[i];
+      if(bbLsr.status==='fulfilled' && bbLsr.value?.result?.list?.length>0){
+        const arr = bbLsr.value.result.list;
+        lsrVals.cur.push(parseFloat(arr[0].buyRatio) / parseFloat(arr[0].sellRatio));
+        if(arr.length>=2) lsrVals.prev.push(parseFloat(arr[1].buyRatio) / parseFloat(arr[1].sellRatio));
+      }
+
+      if(lsrVals.cur.length>0){
+        cache[`${sym}_lsr_${iv}`]      = lsrVals.cur.reduce((a,b)=>a+b,0)/lsrVals.cur.length;
+        cache[`${sym}_lsr_${iv}_prev`] = lsrVals.prev.length>0
+          ? lsrVals.prev.reduce((a,b)=>a+b,0)/lsrVals.prev.length
+          : null;
+      }
+    });
+  }
+}
+
+// Enriquece os 20 tokens atualmente visíveis na tabela (respeitando sort/filtro atual)
+async function enrichVisibleTop20(){
+  const q=document.getElementById('search').value.trim().toUpperCase();
+  let list = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
+
+  // Aplica filtros avançados igual ao render
+  // Filtra favoritos
+  if(showFavOnly) filteredData = filteredData.filter(d=>favorites.includes(d.symbol));
+  const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir;
+  if(hasAdvFilter) list = list.filter(d => passAdvFilter(d));
+
+  // Ordena igual ao render para pegar os mesmos 20 que aparecem na tela
+  list.sort((a,b)=>{
+    let av=getVal(a,sortCol), bv=getVal(b,sortCol);
+    if(av==null) av=sortDir==='desc'?-Infinity:Infinity;
+    if(bv==null) bv=sortDir==='desc'?-Infinity:Infinity;
+    return sortDir==='desc'?bv-av:av-bv;
+  });
+
+  const top20 = list.slice(0,20).map(d=>({symbol:d._sym}));
+  await enrichAll(top20, activeIVs);
+}
+
+function buildCols(){
+  const fixed = FIXED_COLS.filter(c=>c.always||activeCols.includes(c.id));
+  const oiCols  = activeIVs.map(iv=>({id:`oi_${iv}`,  label:iv, group:'oi',  iv}));
+  const lsrCols = activeIVs.map(iv=>({id:`lsr_${iv}`, label:iv, group:'lsr', iv}));
+  return [...fixed, ...oiCols, ...lsrCols];
+}
+
+function buildHeader(cols){
+  const fixedCount = cols.filter(c=>!c.group).length;
+  const oiCount    = cols.filter(c=>c.group==='oi').length;
+  const lsrCount   = cols.filter(c=>c.group==='lsr').length;
+  let grp='<tr class="grp">';
+  grp+=`<th colspan="${fixedCount}"></th>`;
+  if(oiCount)  grp+=`<th colspan="${oiCount}"  class="g-oi">Open Interest</th>`;
+  if(lsrCount) grp+=`<th colspan="${lsrCount}" class="g-lsr">Long / Short Ratio</th>`;
+  grp+='</tr>';
+  let sub='<tr class="sub">';
+  for(const c of cols){
+    const isSorted=sortCol===c.id;
+    const cls=isSorted?(sortDir==='asc'?'sa':'sd'):'';
+    const lsrCols = cols.filter(x=>x.group==='lsr');
+    const oiCols  = cols.filter(x=>x.group==='oi');
+    const firstLsr = lsrCols.length>0 && c===lsrCols[0];
+    const lastOi   = oiCols.length>0  && c===oiCols[oiCols.length-1];
+    const sep = firstLsr ? ' style="border-left:2px solid var(--accent2);padding-left:20px"'
+              : lastOi   ? ' style="padding-right:20px"' : '';
+    sub+=`<th class="${cls}" onclick="setSort('${c.id}')"${sep}>${c.label}<span class="si2"></span></th>`;
+  }
+  sub+='</tr>';
+  document.getElementById('th').innerHTML=grp+sub;
+}
+
+function getVal(d, colId){
+  if(colId.startsWith('oi_')){
+    const iv=colId.replace('oi_','');
+    return cache[`${d._sym}_oi_${iv}`]??null;
+  }
+  if(colId.startsWith('lsr_')){
+    const iv=colId.replace('lsr_','');
+    return cache[`${d._sym}_lsr_${iv}`]??null;
+  }
+  if(colId==='funding') return getAvgFunding(d.symbol);
+  return d[colId]??null;
+}
+
+function render(){
+  const q=document.getElementById('search').value.trim().toUpperCase();
+  filteredData = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
+  // Aplica filtros avançados
+  // Filtra favoritos
+  if(showFavOnly) filteredData = filteredData.filter(d=>favorites.includes(d.symbol));
+  const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir;
+  if(hasAdvFilter) filteredData = filteredData.filter(d => passAdvFilter(d));
+
+  // Ordena
+  filteredData.sort((a,b)=>{
+    let av=getVal(a,sortCol), bv=getVal(b,sortCol);
+    if(av==null) av=sortDir==='desc'?-Infinity:Infinity;
+    if(bv==null) bv=sortDir==='desc'?-Infinity:Infinity;
+    return sortDir==='desc'?bv-av:av-bv;
+  });
+
+  // Pega apenas os top 20 dinâmicos
+  const displayData = filteredData.slice(0, 20);
+
+  const cols=buildCols();
+  buildHeader(cols);
+  renderRows(cols, displayData);
+  updateStats();
+}
+
+function renderRows(cols, data){
+  const tb=document.getElementById('tb');
+  if(!data.length){tb.innerHTML='<tr class="sr"><td colspan="20">Nenhum token encontrado.</td></tr>';return;}
+  let html='';
+  for(const d of data){
+    html+='<tr>';
+    for(const c of cols){
+      const lsrCols = cols.filter(x=>x.group==='lsr');
+      const oiCols  = cols.filter(x=>x.group==='oi');
+      const firstLsr = lsrCols.length>0 && c===lsrCols[0];
+      const lastOi   = oiCols.length>0  && c===oiCols[oiCols.length-1];
+      const sep = firstLsr ? ' style="border-left:2px solid var(--accent2);padding-left:20px"'
+                : lastOi   ? ' style="padding-right:20px"' : '';
+      html+=`<td${sep}>${cell(c.id,d)}</td>`;
+    }
+    html+='</tr>';
+  }
+  tb.innerHTML=html;
+}
+
+function cell(id,d){
+  if(id.startsWith('oi_')){
+    const v=getVal(d,id);
+    if(v==null) return '<span class="neu">—</span>';
+    const iv=id.replace('oi_','');
+    const prev=cache[`${d._sym}_oi_${iv}_prev`];
+    let cls='';
+    if(prev!=null){
+      cls = v>prev ? 'pos' : v<prev ? 'neg' : '';
+    }
+    const pct = (prev!=null && prev!==0) ? ((v-prev)/prev*100) : null;
+    const pctStr = pct!=null ? ` <span style="font-size:10px;opacity:.7">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
+    return `<span class="num ${cls}">${fmtK(v)}</span>${pctStr}`;
+  }
+  if(id.startsWith('lsr_')){
+    const v=getVal(d,id);
+    if(v==null) return '<span class="neu">—</span>';
+    const iv=id.replace('lsr_','');
+    const prev=cache[`${d._sym}_lsr_${iv}_prev`];
+    const pct = (prev!=null && prev!==0) ? ((v-prev)/prev*100) : null;
+    const pctStr = pct!=null ? ` <span style="font-size:10px;opacity:.7">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
+    return `<span class="num ${v>=1?'pos':'neg'}">${fmt(v,3)}</span>${pctStr}`;
+  }
+  switch(id){
+    case 'symbol': {
+      const sym = d._sym;
+      const base = d.symbol;
+      const tvUrl = `https://www.tradingview.com/symbols/${sym}.P/markets/`;
+      const isFav = favorites.includes(base);
+      return `<div class="sym">
+        <button class="fav-btn ${isFav?'on':''}" onclick="toggleFav('${base}',event)" title="${isFav?'Remover dos favoritos':'Adicionar aos favoritos'}">★</button>
+        <a href="${tvUrl}" target="_blank" rel="noopener" style="text-decoration:none"><span class="base">${base}</span> <span style="font-size:9px;color:var(--muted);opacity:.7">↗</span></a>
+        <span class="q">/USDT</span>
+      </div>`;
+    }
+
+    case 'price':  return `<span class="num">${fmtP(d.price)}</span>`;
+    case 'volume': return `<span class="num">${fmtK(d.volume)}</span>`;
+    case 'trades': return `<span class="num">${fmtK(d.trades)}</span>`;
+    case 'funding':{
+      const avg=getAvgFunding(d.symbol);
+      if(avg==null) return '<span class="neu">—</span>';
+      const exData = fundingMap[d.symbol] || {};
+      const exCount = Object.keys(exData).length;
+      const cls=avg>0.005?'fp':avg<-0.005?'fn':'fz';
+      const p=avg>0?'+':'';
+      const tip = "(normalizado para 8h) " + Object.entries(exData).map(([ex,v])=>`${ex}: ${v!=null?(v>0?'+':'')+v.toFixed(4)+'%':'—'}`).join(' | ');
+      return `<span class="fb ${cls}" title="${tip}" style="cursor:help">${p}${avg.toFixed(4)}%</span><span class="excount" title="${tip}">${exCount}ex</span>`;
+    }
+    default: return '—';
+  }
+}
+
+function updateStats(){
+  document.getElementById('sT').textContent=filteredData.length;
+  document.getElementById('sFp').textContent=filteredData.filter(d=>{ const v=getAvgFunding(d.symbol); return v!=null&&v>0; }).length;
+  document.getElementById('sFn').textContent=filteredData.filter(d=>{ const v=getAvgFunding(d.symbol); return v!=null&&v<0; }).length;
+}
+
+function buildColToggles(){
+  const w=document.getElementById('colTg'); w.innerHTML='';
+  for(const c of FIXED_COLS){
+    if(c.always) continue;
+    const b=document.createElement('button');
+    b.className='t'+(activeCols.includes(c.id)?' on':'');
+    b.textContent=c.label;
+    b.onclick=()=>{ const i=activeCols.indexOf(c.id); i>=0?activeCols.splice(i,1):activeCols.push(c.id); b.classList.toggle('on'); saveC(); render(); };
+    w.appendChild(b);
+  }
+}
+
+function buildIVToggles(){
+  const w=document.getElementById('ivTg'); w.innerHTML='';
+  for(const iv of INTERVALS){
+    const b=document.createElement('button');
+    b.className='t'+(activeIVs.includes(iv.id)?' iv':'');
+    b.textContent=iv.l;
+    b.onclick=()=>toggleIV(iv.id,b);
+    w.appendChild(b);
+  }
+}
+
+async function toggleIV(id,btn){
+  if(activeIVs.includes(id)){
+    if(activeIVs.length===1) return;
+    activeIVs=activeIVs.filter(i=>i!==id);
+    btn.classList.remove('iv');
+  } else {
+    activeIVs.push(id);
+    btn.classList.add('iv');
+    // busca o novo timeframe apenas pros 20 visíveis (respeitando sort atual)
+    const q=document.getElementById('search').value.trim().toUpperCase();
+    let list = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
+    list.sort((a,b)=>{
+      let av=getVal(a,sortCol), bv=getVal(b,sortCol);
+      if(av==null) av=sortDir==='desc'?-Infinity:Infinity;
+      if(bv==null) bv=sortDir==='desc'?-Infinity:Infinity;
+      return sortDir==='desc'?bv-av:av-bv;
+    });
+    const top20 = list.slice(0,20).map(d=>({symbol:d._sym}));
+    await enrichAll(top20,[id]);
+  }
+  saveC(); render();
+}
+
+function setSort(col){
+  if(sortCol===col) sortDir=sortDir==='desc'?'asc':'desc';
+  else{sortCol=col;sortDir='desc';}
+  saveC();
+  render(); // mostra imediatamente com dados que já temos (pode ter —)
+  enrichVisibleTop20().then(()=>render()); // busca dados dos novos 20 e re-renderiza
+}
+
+// Atualiza silenciosamente só as células visíveis — sem piscar
+function updateCellSilent(sym, colId, newHtml){
+  const rows = document.getElementById('tb').querySelectorAll('tr');
+  const cols = buildCols();
+  const colIdx = cols.findIndex(c=>c.id===colId);
+  if(colIdx<0) return;
+  for(const row of rows){
+    const tds = row.querySelectorAll('td');
+    // identifica a linha pelo símbolo
+    const symEl = tds[0]?.querySelector('.base');
+    if(symEl && symEl.textContent === sym){
+      if(tds[colIdx]) tds[colIdx].innerHTML = newHtml;
+      break;
+    }
+  }
+}
+
+// Atualiza funding de todas as linhas visíveis silenciosamente
+async function silentUpdateFunding(){
+  await fetchAllFunding();
+  const rows = document.getElementById('tb').querySelectorAll('tr');
+  const cols = buildCols();
+  const fundingIdx = cols.findIndex(c=>c.id==='funding');
+  if(fundingIdx<0) return;
+  for(const row of rows){
+    const tds = row.querySelectorAll('td');
+    const symEl = tds[0]?.querySelector('.base');
+    if(!symEl) continue;
+    const sym = symEl.textContent;
+    const d = allData.find(x=>x.symbol===sym);
+    if(!d) continue;
+    if(tds[fundingIdx]) tds[fundingIdx].innerHTML = cell('funding', d);
+  }
+  // Atualiza stats
+  updateStats();
+  document.getElementById('upd').textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR');
+}
+
+// Atualiza OI/LSR das linhas visíveis silenciosamente
+async function silentUpdateOI(){
+  await enrichVisibleTop20();
+  const rows = document.getElementById('tb').querySelectorAll('tr');
+  const cols = buildCols();
+  for(const row of rows){
+    const tds = row.querySelectorAll('td');
+    const symEl = tds[0]?.querySelector('.base');
+    if(!symEl) continue;
+    const sym = symEl.textContent;
+    const d = allData.find(x=>x.symbol===sym);
+    if(!d) continue;
+    cols.forEach((c,i)=>{
+      if((c.id.startsWith('oi_')||c.id.startsWith('lsr_')) && tds[i]){
+        tds[i].innerHTML = cell(c.id, d);
+      }
+    });
+  }
+}
+
+// Atualização completa (preço, volume, trades) — reordena a tabela
+async function silentUpdateFull(){
+  try{
+    const tickers = await fj('https://fapi.binance.com/fapi/v1/ticker/24hr');
+    const map = {};
+    for(const t of tickers){
+      if(t.symbol.endsWith('USDT')) map[t.symbol] = t;
+    }
+    for(const d of allData){
+      const t = map[d._sym];
+      if(t){
+        d.price  = parseFloat(t.lastPrice);
+        d.volume = parseFloat(t.quoteVolume);
+        d.trades = parseInt(t.count);
+      }
+    }
+    // Re-renderiza só se sort for por volume/price/trades (muda ordem)
+    if(['volume','price','trades'].includes(sortCol)) render();
+    else {
+      // só atualiza as células de preço/volume/trades sem reordenar
+      const rows = document.getElementById('tb').querySelectorAll('tr');
+      const cols = buildCols();
+      for(const row of rows){
+        const tds = row.querySelectorAll('td');
+        const symEl = tds[0]?.querySelector('.base');
+        if(!symEl) continue;
+        const sym = symEl.textContent;
+        const d = allData.find(x=>x.symbol===sym);
+        if(!d) continue;
+        cols.forEach((c,i)=>{
+          if(['price','volume','trades'].includes(c.id) && tds[i]){
+            tds[i].innerHTML = cell(c.id, d);
+          }
+        });
+      }
+    }
+  }catch(e){}
+}
+
+loadC();
+buildColToggles();
+buildIVToggles();
+loadData();
+
+// ── WEBSOCKETS ────────────────────────────────────────────────────
+
+let wsBinance = null;
+let wsBybit   = null;
+let wsBitget  = null;
+let wsReconnectTimer = null;
+
+function startWebSockets(){
+  startBinanceWS();
+  startBybitWS();
+  startBitgetWS();
+}
+
+// ── Binance WebSocket: preço + volume + trades + funding ──────────
+function startBinanceWS(){
+  if(wsBinance) wsBinance.close();
+  // !miniTicker@arr → todos os tickers em tempo real
+  wsBinance = new WebSocket('wss://fstream.binance.com/ws/!miniTicker@arr');
+  
+  wsBinance.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if(!Array.isArray(data)) return;
+    let changed = false;
+    for(const t of data){
+      if(!t.s || !t.s.endsWith('USDT')) continue;
+      const d = allData.find(x=>x._sym===t.s);
+      if(!d) continue;
+      d.price  = parseFloat(t.c); // close price
+      d.volume = parseFloat(t.q); // quote volume
+      d.trades = parseInt(t.n);   // trades count
+      changed = true;
+    }
+    if(changed) updatePriceCells();
+  };
+
+  wsBinance.onerror = () => {};
+  wsBinance.onclose = () => {
+    // Reconecta após 3s
+    setTimeout(startBinanceWS, 3000);
+  };
+}
+
+// ── Bybit WebSocket: funding rate ─────────────────────────────────
+function startBybitWS(){
+  if(wsBybit) wsBybit.close();
+  wsBybit = new WebSocket('wss://stream.bybit.com/v5/public/linear');
+  
+  wsBybit.onopen = () => {
+    // Subscreve tickers de todos os pares USDT
+    wsBybit.send(JSON.stringify({op:'subscribe', args:['tickers.BTCUSDT','tickers.ETHUSDT','tickers.SOLUSDT']}));
+    // Subscreve stream geral de tickers
+    wsBybit.send(JSON.stringify({op:'subscribe', args:['tickers.*']}));
+  };
+
+  wsBybit.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if(msg.topic && msg.topic.startsWith('tickers.') && msg.data){
+      const d = msg.data;
+      if(d.symbol && d.symbol.endsWith('USDT') && d.fundingRate){
+        const token = d.symbol.replace('USDT','');
+        setFunding(token, 'bybit', parseFloat(d.fundingRate)*100);
+        updateFundingCell(token);
+      }
+    }
+  };
+
+  wsBybit.onerror = () => {};
+  wsBybit.onclose = () => setTimeout(startBybitWS, 3000);
+}
+
+// ── Bitget WebSocket: funding rate ────────────────────────────────
+function startBitgetWS(){
+  if(wsBitget) wsBitget.close();
+  wsBitget = new WebSocket('wss://ws.bitget.com/v2/ws/public');
+
+  wsBitget.onopen = () => {
+    wsBitget.send(JSON.stringify({op:'subscribe', args:[{instType:'USDT-FUTURES', channel:'ticker', instId:'default'}]}));
+  };
+
+  wsBitget.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if(msg.data && Array.isArray(msg.data)){
+      for(const d of msg.data){
+        if(d.instId && d.fundingRate){
+          const token = d.instId.replace('USDT','');
+          setFunding(token, 'bitget', parseFloat(d.fundingRate)*100);
+          updateFundingCell(token);
+        }
+      }
+    }
+  };
+
+  wsBitget.onerror = () => {};
+  wsBitget.onclose = () => setTimeout(startBitgetWS, 3000);
+}
+
+// ── Atualiza células de preço/volume/trades sem reordenar ─────────
+function updatePriceCells(){
+  const rows = document.getElementById('tb').querySelectorAll('tr');
+  const cols = buildCols();
+  for(const row of rows){
+    const tds = row.querySelectorAll('td');
+    const symEl = tds[0]?.querySelector('.base');
+    if(!symEl) continue;
+    const sym = symEl.textContent;
+    const d = allData.find(x=>x.symbol===sym);
+    if(!d) continue;
+    cols.forEach((c,i)=>{
+      if(['price','volume','trades'].includes(c.id) && tds[i]){
+        tds[i].innerHTML = cell(c.id, d);
+      }
+    });
+  }
+  document.getElementById('upd').textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR');
+}
+
+// ── Atualiza célula de funding de um token específico ─────────────
+function updateFundingCell(token){
+  const rows = document.getElementById('tb').querySelectorAll('tr');
+  const cols = buildCols();
+  const fundingIdx = cols.findIndex(c=>c.id==='funding');
+  if(fundingIdx<0) return;
+  for(const row of rows){
+    const tds = row.querySelectorAll('td');
+    const symEl = tds[0]?.querySelector('.base');
+    if(!symEl) continue;
+    if(symEl.textContent === token){
+      const d = allData.find(x=>x.symbol===token);
+      if(d && tds[fundingIdx]) tds[fundingIdx].innerHTML = cell('funding', d);
+      break;
+    }
+  }
+}
+
+// Inicia WebSockets após carregar dados
+setTimeout(startWebSockets, 2000);
+
+// Funding REST como fallback a cada 15s (para exchanges sem WS)
+setInterval(silentUpdateFunding, 15000);
+
+// OI/LSR: atualiza a cada 15s silenciosamente
+setInterval(silentUpdateOI, 15000);
+
+// Preço REST como fallback a cada 30s (caso WS caia)
+setInterval(silentUpdateFull, 30000);
+</script>
+
+<!-- Painel de Alertas -->
+<div class="alert-panel" id="alertPanel">
+  <div class="ap-head">
+    <h2>🔔 Alertas</h2>
+    <button class="ap-close" onclick="toggleAlertPanel()">✕</button>
+  </div>
+  <div class="ap-body" id="alertList"></div>
+  <div class="ap-footer">
+    <button class="btn btnp" style="width:100%" onclick="openCreateAlert()">+ Criar Alerta</button>
+  </div>
+</div>
+
+<!-- Modal Criar Alerta -->
+<div class="modal-bg" id="alertModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">Criar Alerta</h3>
+      <button class="ap-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Nome do Alerta</label>
+        <input type="text" id="alertName" placeholder="Ex: Funding alto + OI subindo">
+      </div>
+      <div class="field">
+        <label>Token (deixe vazio para qualquer token)</label>
+        <input type="text" id="alertToken" placeholder="Ex: BTC, ETH (ou vazio para todos)">
+      </div>
+      <div class="field">
+        <label>Condições (todas precisam ser verdadeiras)</label>
+        <div class="cond-list" id="condList"></div>
+        <button class="add-cond" onclick="addCondRow()">+ Adicionar Condição</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btnp" onclick="saveAlert()">Salvar Alerta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+const COND_COLS = [
+  {id:'funding',    label:'Funding Avg (%)'},
+  {id:'price',      label:'Preço'},
+  {id:'volume',     label:'Volume'},
+  {id:'trades',     label:'Trades'},
+  {id:'oi_5m',      label:'OI 5m (valor)'},
+  {id:'oi_15m',     label:'OI 15m (valor)'},
+  {id:'oi_1h',      label:'OI 1h (valor)'},
+  {id:'oi_4h',      label:'OI 4h (valor)'},
+  {id:'oi_1d',      label:'OI 1d (valor)'},
+  {id:'oi_dir_5m',  label:'OI 5m direção'},
+  {id:'oi_dir_15m', label:'OI 15m direção'},
+  {id:'oi_dir_1h',  label:'OI 1h direção'},
+  {id:'oi_dir_4h',  label:'OI 4h direção'},
+  {id:'oi_dir_1d',  label:'OI 1d direção'},
+  {id:'lsr_5m',     label:'LSR 5m'},
+  {id:'lsr_15m',    label:'LSR 15m'},
+  {id:'lsr_1h',     label:'LSR 1h'},
+  {id:'lsr_4h',     label:'LSR 4h'},
+  {id:'lsr_1d',     label:'LSR 1d'},
+];
+
+const OPERATORS = [
+  {id:'gt',  label:'> maior que'},
+  {id:'lt',  label:'< menor que'},
+  {id:'gte', label:'≥ maior ou igual'},
+  {id:'lte', label:'≤ menor ou igual'},
+  {id:'up',  label:'↑ subindo'},
+  {id:'dn',  label:'↓ caindo'},
+];
+
+let alerts = JSON.parse(localStorage.getItem('perpAlerts')||'[]');
+let editingId = null;
+let triggeredTokens = {};
+
+function saveAlerts(){ localStorage.setItem('perpAlerts', JSON.stringify(alerts)); }
+
+function toggleAlertPanel(){
+  document.getElementById('alertPanel').classList.toggle('open');
+  renderAlertList();
+}
+
+function openCreateAlert(){
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'Criar Alerta';
+  document.getElementById('alertName').value = '';
+  document.getElementById('alertToken').value = '';
+  document.getElementById('condList').innerHTML = '';
+  addCondRow();
+  document.getElementById('alertModal').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('alertModal').classList.remove('open');
+}
+
+function addCondRow(cond){
+  const list = document.getElementById('condList');
+  const div = document.createElement('div');
+  div.className = 'cond-row';
+  const colOpts = COND_COLS.map(c=>`<option value="${c.id}" ${cond&&cond.col===c.id?'selected':''}>${c.label}</option>`).join('');
+  const isDir = cond && cond.col && cond.col.startsWith('oi_dir_');
+  const opOpts = (isDir
+    ? [{id:'up',label:'↑ subindo'},{id:'dn',label:'↓ caindo'}]
+    : OPERATORS
+  ).map(o=>`<option value="${o.id}" ${cond&&cond.op===o.id?'selected':''}>${o.label}</option>`).join('');
+  div.innerHTML = `
+    <select class="cond-col" onchange="updateCondRow(this)">${colOpts}</select>
+    <select class="cond-op">${opOpts}</select>
+    <input class="cond-val" type="number" step="any" placeholder="Valor" value="${cond&&cond.val!=null?cond.val:''}" style="${isDir?'display:none':''}">
+    <button class="cond-del" onclick="this.parentElement.remove()">✕</button>`;
+  list.appendChild(div);
+}
+
+function updateCondRow(sel){
+  const row = sel.closest('.cond-row');
+  const op  = row.querySelector('.cond-op');
+  const val = row.querySelector('.cond-val');
+  const isDir = sel.value.startsWith('oi_dir_');
+  if(isDir){
+    op.innerHTML = [{id:'up',label:'↑ subindo'},{id:'dn',label:'↓ caindo'}].map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
+    val.style.display = 'none'; val.value = '';
+  } else {
+    op.innerHTML = OPERATORS.map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
+    val.style.display = '';
+  }
+}
+
+function saveAlert(){
+  const name  = document.getElementById('alertName').value.trim() || 'Alerta';
+  const token = document.getElementById('alertToken').value.trim().toUpperCase();
+  const rows  = document.getElementById('condList').querySelectorAll('.cond-row');
+  const conditions = [];
+  for(const row of rows){
+    const col = row.querySelector('.cond-col').value;
+    const op  = row.querySelector('.cond-op').value;
+    const val = parseFloat(row.querySelector('.cond-val').value);
+    conditions.push({col, op, val: isNaN(val)?null:val});
+  }
+  if(conditions.length===0){ alert('Adicione pelo menos uma condição.'); return; }
+  if(editingId){
+    const idx = alerts.findIndex(a=>a.id===editingId);
+    if(idx>=0) alerts[idx] = {...alerts[idx], name, token, conditions};
+  } else {
+    alerts.push({id:Date.now().toString(), name, token, conditions, active:true, lastTriggered:null});
+  }
+  saveAlerts(); closeModal(); renderAlertList();
+}
+
+function deleteAlert(id){ alerts=alerts.filter(a=>a.id!==id); saveAlerts(); renderAlertList(); }
+function toggleAlert(id){ const a=alerts.find(x=>x.id===id); if(a){a.active=!a.active;saveAlerts();renderAlertList();} }
+
+function renderAlertList(){
+  const el = document.getElementById('alertList');
+  if(alerts.length===0){
+    el.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">Nenhum alerta criado.<br>Clique em <b>+ Criar Alerta</b> para começar.</div>';
+    return;
+  }
+  el.innerHTML = alerts.map(a=>{
+    const triggered = triggeredTokens[a.id]&&triggeredTokens[a.id].length>0;
+    const condHtml = a.conditions.map(c=>{
+      const col=COND_COLS.find(x=>x.id===c.col); const op=OPERATORS.find(x=>x.id===c.op);
+      return `<div class="ac-cond">${col?col.label:c.col} <span>${op?op.label:c.op}</span> ${c.val!=null?'<span>'+c.val+'</span>':''}</div>`;
+    }).join('');
+    return `<div class="alert-card ${a.active?'active':''} ${triggered?'triggered':''}">
+      <div class="ac-head">
+        <div class="ac-name">${a.name}${a.token?' <span style="color:var(--accent);font-size:11px">['+a.token+']</span>':''}</div>
+        <button class="ac-toggle ${a.active?'on':''}" onclick="toggleAlert('${a.id}')"></button>
+        <button class="ac-del" onclick="deleteAlert('${a.id}')">🗑</button>
+      </div>
+      <div class="ac-conditions">${condHtml}</div>
+      ${triggered?`<div class="ac-triggered">🔴 Ativo: ${triggeredTokens[a.id].join(', ')}</div>`:''}
+      ${a.lastTriggered?`<div style="font-size:10px;color:var(--muted)">Último: ${a.lastTriggered}</div>`:''}
+    </div>`;
+  }).join('');
+  const active = Object.values(triggeredTokens).filter(v=>v.length>0).length;
+  const badge = document.getElementById('alertBadge');
+  badge.style.display = active>0?'':'none';
+  badge.textContent = active;
+}
+
+function evalAlert(alertObj, d){
+  if(!alertObj.active) return false;
+  if(alertObj.token && alertObj.token !== d.symbol) return false;
+  for(const cond of alertObj.conditions){
+    const {col, op, val} = cond;
+    let v = null;
+    if(col==='funding') v = getAvgFunding(d.symbol);
+    else if(col==='price') v = d.price;
+    else if(col==='volume') v = d.volume;
+    else if(col==='trades') v = d.trades;
+    else if(col.startsWith('oi_dir_')){
+      const iv=col.replace('oi_dir_','');
+      const cur=cache[`${d._sym}_oi_${iv}`], prev=cache[`${d._sym}_oi_${iv}_prev`];
+      if(cur==null||prev==null) return false;
+      if(op==='up'&&cur<=prev) return false;
+      if(op==='dn'&&cur>=prev) return false;
+      continue;
+    } else if(col.startsWith('oi_')){
+      v = cache[`${d._sym}_oi_${col.replace('oi_','')}`];
+    } else if(col.startsWith('lsr_')){
+      v = cache[`${d._sym}_lsr_${col.replace('lsr_','')}`];
+    }
+    if(v==null) return false;
+    if(op==='gt' &&!(v> val)) return false;
+    if(op==='lt' &&!(v< val)) return false;
+    if(op==='gte'&&!(v>=val)) return false;
+    if(op==='lte'&&!(v<=val)) return false;
+  }
+  return true;
+}
+
+function checkAlerts(){
+  if(!allData||allData.length===0) return;
+  for(const a of alerts){
+    if(!a.active) continue;
+    const hit = allData.filter(d=>evalAlert(a,d)).map(d=>d.symbol);
+    const prev = triggeredTokens[a.id]||[];
+    const isNew = hit.length>0 && hit.some(s=>!prev.includes(s));
+    if(isNew){ a.lastTriggered=new Date().toLocaleTimeString('pt-BR'); showToast(a.name, hit); }
+    triggeredTokens[a.id] = hit;
+  }
+  saveAlerts(); renderAlertList();
+  const rows = document.getElementById('tb').querySelectorAll('tr');
+  for(const row of rows){
+    const symEl = row.querySelector('.sym .base')||row.querySelector('.base');
+    if(!symEl) continue;
+    const sym = symEl.textContent;
+    const isHit = Object.values(triggeredTokens).some(arr=>arr.includes(sym));
+    row.classList.toggle('alert-hit', isHit);
+  }
+}
+
+function showToast(alertName, symbols){
+  try{
+    const ctx=new AudioContext(), osc=ctx.createOscillator(), gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880,ctx.currentTime);
+    osc.frequency.setValueAtTime(1100,ctx.currentTime+0.1);
+    gain.gain.setValueAtTime(0.3,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4);
+    osc.start(); osc.stop(ctx.currentTime+0.4);
+  }catch(e){}
+  const container=document.getElementById('toastContainer');
+  const toast=document.createElement('div');
+  toast.className='toast';
+  toast.innerHTML=`<div class="toast-title">🔔 ${alertName}</div><div class="toast-body">Token(s): <b>${symbols.join(', ')}</b></div><div class="toast-time">${new Date().toLocaleTimeString('pt-BR')}</div>`;
+  container.appendChild(toast);
+  setTimeout(()=>toast.remove(), 8000);
+  if(Notification.permission==='granted'){
+    new Notification('🔔 '+alertName,{body:'Token(s): '+symbols.join(', ')});
+  }
+}
+
+if(Notification.permission==='default') Notification.requestPermission();
+setInterval(checkAlerts, 5000);
+renderAlertList();
+</script>
+
+<script>
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.sym-wrap')){
+    document.querySelectorAll('.tv-menu').forEach(m=>m.classList.remove('open'));
+  }
+});
+
+const tvCache = {}; // sym -> [{name, url}]
+
+async function openTVMenu(menuId, sym, e){
+  e.preventDefault();
+  e.stopPropagation();
+  const menu = document.getElementById(menuId);
+  document.querySelectorAll('.tv-menu').forEach(m=>{if(m!==menu) m.classList.remove('open');});
+  menu.classList.toggle('open');
+  if(!menu.classList.contains('open')) return;
+
+  // Já verificado antes
+  if(tvCache[sym]){
+    renderTVMenu(menu, tvCache[sym]);
+    return;
+  }
+
+  menu.innerHTML = '<div class="tv-menu-title">Verificando...</div>';
+
+  const exchanges = [
+    {name:'Binance', symbol:`BINANCE:${sym}USDT.P`},
+    {name:'Bybit',   symbol:`BYBIT:${sym}USDT.P`},
+    {name:'Bitget',  symbol:`BITGET:${sym}USDT.P`},
+    {name:'LBank',   symbol:`LBANK:${sym}USDT`},
+    {name:'BingX',   symbol:`BINGX:${sym}USDT.PS`},
+  ];
+
+  // Busca o símbolo na API de busca do TradingView via proxy
+  const exchanges = [
+    {name:'Binance', symbol:`BINANCE:${sym}USDT.P`},
+    {name:'Bybit',   symbol:`BYBIT:${sym}USDT.P`},
+    {name:'Bitget',  symbol:`BITGET:${sym}USDT.P`},
+    {name:'LBank',   symbol:`LBANK:${sym}USDT`},
+    {name:'BingX',   symbol:`BINGX:${sym}USDT.PS`},
+  ];
+
+  // Verifica via TradingView scanner API (sem CORS)
+  const checkSymbol = (ex) => new Promise(resolve => {
+    const img = new Image();
+    img.src = `https://s.tradingview.com/embed-widget/mini-symbol-overview/?symbol=${ex.symbol}&t=${Date.now()}`;
+    // Usa fetch via no-cors para ver se responde
+    fetch(`https://symbol-search.tradingview.com/symbol_search/v3/?text=${encodeURIComponent(ex.symbol)}&hl=0&exchange=&lang=en&search_type=undefined&domain=production&sort_by_country=US`, {mode:'no-cors'})
+      .then(() => resolve(ex))
+      .catch(() => resolve(null));
+    setTimeout(() => resolve(ex), 1500); // timeout — assume que existe
+  });
+
+  // Verifica cada exchange via fetch ao endpoint de dados
+  const results = await Promise.all(
+    exchanges.map(ex =>
+      fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://symbol-search.tradingview.com/symbol_search/v3/?text=${ex.symbol.replace(':','%3A')}&hl=0&lang=en&search_type=undefined&domain=production`)}`)
+        .then(r => r.json())
+        .then(json => {
+          const data = JSON.parse(json.contents || '[]');
+          const exName = ex.symbol.split(':')[0].toUpperCase();
+          const symName = ex.symbol.split(':')[1].replace('.P','').replace('.PS','').toUpperCase();
+          const found = Array.isArray(data) && data.some(s =>
+            (s.exchange||'').toUpperCase() === exName &&
+            (s.symbol||'').toUpperCase().startsWith(symName)
+          );
+          return found ? ex : null;
+        })
+        .catch(() => null)
+    )
+  );
+
+  const available = results.filter(v => v !== null).map(ex => ({
+    name: ex.name,
+    url: `https://www.tradingview.com/chart/?symbol=${ex.symbol}`
+  }));
+
+  tvCache[sym] = available;
+  renderTVMenu(menu, available);
+}
+
+function renderTVMenu(menu, available){
+  if(available.length===0){
+    menu.innerHTML = '<div class="tv-menu-title">Nenhum gráfico encontrado</div>';
+    return;
+  }
+  menu.innerHTML = '<div class="tv-menu-title">Abrir gráfico</div>'
+    + available.map(ex=>`<a href="${ex.url}" target="_blank" rel="noopener">${ex.name}</a>`).join('');
+}
+</script>
+</body>
+</html>
