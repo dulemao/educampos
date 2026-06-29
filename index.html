@@ -1224,7 +1224,7 @@ async function silentUpdateOI(){
     const d = allData.find(x=>x.symbol===sym);
     if(!d) continue;
     cols.forEach((c,i)=>{
-      if((c.id.startsWith('oi_')||c.id.startsWith('lsr_')||c.id.startsWith('cvd_')) && tds[i]){
+      if((c.id.startsWith('oi_')||c.id.startsWith('lsr_')||c.id.startsWith('cvd_')||c.id.startsWith('lat_')) && tds[i]){
         tds[i].innerHTML = cell(c.id, d);
       }
     });
