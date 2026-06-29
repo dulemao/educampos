@@ -149,6 +149,11 @@
   .fav-btn.on{opacity:1;color:#fbbf24;text-shadow:0 0 2px #fbbf24}
   .fav-btn:hover{opacity:.8;transform:scale(1.2)}
   .t.fav-on{background:rgba(251,191,36,.1);border-color:#fbbf24;color:#fbbf24}
+
+  /* ── CVD ── */
+  thead tr.grp th.g-cvd{color:#f97316;border-top:2px solid #f97316;background:rgba(249,115,22,.03)}
+  thead tr.grp th.g-lat{color:#facc15;border-top:2px solid #facc15;background:rgba(250,204,21,.03)}
+
 </style>
 </head>
 <body>
@@ -169,7 +174,7 @@
   <div class="cl">COLUNAS:</div>
   <div class="tg" id="colTg"></div>
   <div class="sep"></div>
-  <div class="cl">TIMEFRAMES (OI & LSR):</div>
+  <div class="cl">TIMEFRAMES (OI, LSR & CVD):</div>
   <div class="tg" id="ivTg"></div>
 </div>
 
@@ -224,6 +229,17 @@
     </select>
   </div>
 
+  <div class="fbar-group" id="fg-cvd">
+    <label>CVD (conjunto)</label>
+    <select id="fCvdDir" onchange="applyAdvFilters()">
+      <option value="">--</option>
+      <option value="up">↑ maioria subindo</option>
+      <option value="dn">↓ maioria caindo</option>
+      <option value="all_up">↑↑ todos subindo</option>
+      <option value="all_dn">↓↓ todos caindo</option>
+    </select>
+  </div>
+
   <button class="fbar-clear" onclick="clearAdvFilters()">✕ Limpar</button>
 </div>
 
@@ -234,7 +250,8 @@
   <div id="exStatus" style="color:var(--muted)"></div>
 </div>
 
-<div class="tw"><table id="tbl"><thead id="th"></thead><tbody id="tb"><tr class="sr"><td colspan="20"><span class="spin"></span>Carregando dados...</td></tr></tbody></table></div>
+<div id="topScroll" style="overflow-x:auto;overflow-y:hidden;height:16px;padding:0 20px;"><div id="topScrollInner" style="height:1px;"></div></div>
+<div class="tw" id="tw"><table id="tbl"><thead id="th"></thead><tbody id="tb"><tr class="sr"><td colspan="20"><span class="spin"></span>Carregando dados...</td></tr></tbody></table></div>
 
 <script>
 const INTERVALS = [{id:'5m',l:'5m'},{id:'15m',l:'15m'},{id:'1h',l:'1h'},{id:'4h',l:'4h'},{id:'1d',l:'1D'}];
@@ -257,7 +274,7 @@ let sortCol    = 'volume';
 let sortDir    = 'desc';
 let allData    = [];
 let filteredData = [];
-let advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'' };
+let advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'', cvdDir:'' };
 let favorites = JSON.parse(localStorage.getItem('perpFavorites')||'[]');
 let showFavOnly = false;
 
@@ -290,12 +307,14 @@ function applyAdvFilters(){
   advFilters.fundingVal = document.getElementById('fFundingVal').value;
   advFilters.oiDir      = document.getElementById('fOiDir').value;
   advFilters.lsrDir     = document.getElementById('fLsrDir').value;
+  advFilters.cvdDir     = document.getElementById('fCvdDir').value;
   
   // Destaca grupos ativos
   document.getElementById('fg-volume').classList.toggle('active', !!(advFilters.volumeOp && advFilters.volumeVal!==''));
   document.getElementById('fg-funding').classList.toggle('active', !!(advFilters.fundingOp && advFilters.fundingVal!==''));
   document.getElementById('fg-oi').classList.toggle('active', !!advFilters.oiDir);
   document.getElementById('fg-lsr').classList.toggle('active', !!advFilters.lsrDir);
+  document.getElementById('fg-cvd').classList.toggle('active', !!advFilters.cvdDir);
   
   render();
 }
@@ -308,11 +327,13 @@ function clearAdvFilters(){
   document.getElementById('fFundingVal').value='';
   document.getElementById('fOiDir').value='';
   document.getElementById('fLsrDir').value='';
-  advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'' };
+  document.getElementById('fCvdDir').value='';
+  advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'', cvdDir:'' };
   document.getElementById('fg-volume').classList.remove('active');
   document.getElementById('fg-funding').classList.remove('active');
   document.getElementById('fg-oi').classList.remove('active');
   document.getElementById('fg-lsr').classList.remove('active');
+  document.getElementById('fg-cvd').classList.remove('active');
   render();
 }
 
@@ -378,7 +399,28 @@ function passAdvFilter(d){
     if(advFilters.lsrDir==='all_up' && !(ups === total)) return false;
     if(advFilters.lsrDir==='all_dn' && !(dns === total)) return false;
   }
-  
+
+  // CVD filter (direção do conjunto dos timeframes ativos)
+  if(advFilters.cvdDir){
+    const activeIvsNow = ivs.filter(iv => activeIVs.includes(iv));
+    const results = activeIvsNow.map(iv=>{
+      const cur  = cache[`${d._sym}_cvd_${iv}`];
+      const prev = cache[`${d._sym}_cvd_${iv}_prev`];
+      if(cur==null||prev==null) return null;
+      return cur > prev ? 'up' : cur < prev ? 'dn' : 'flat';
+    }).filter(r=>r!==null);
+
+    if(results.length===0) return false;
+    const ups = results.filter(r=>r==='up').length;
+    const dns = results.filter(r=>r==='dn').length;
+    const total = results.length;
+
+    if(advFilters.cvdDir==='up'     && !(ups > total/2)) return false;
+    if(advFilters.cvdDir==='dn'     && !(dns > total/2)) return false;
+    if(advFilters.cvdDir==='all_up' && !(ups === total)) return false;
+    if(advFilters.cvdDir==='all_dn' && !(dns === total)) return false;
+  }
+
   return true;
 }
 let cache      = {}; 
@@ -643,8 +685,11 @@ async function loadData(){
       trades:  parseInt(t.count),
     }));
 
-    // Primeiro render para montar a lista ordenada, depois enriquecer os 20 visíveis
-    render();
+    // Se há filtro que depende do cache (OI/LSR/CVD/lateralização), o cache ainda
+    // está vazio aqui — renderizar agora aplicaria o filtro e reprovaria todo mundo.
+    // Nesse caso, pula o render provisório e só renderiza depois do enrich.
+    const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir);
+    if(!needsCacheFilter) render();
     await enrichVisibleTop20();
     render();
     document.getElementById('upd').textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR');
@@ -729,21 +774,92 @@ async function enrichAll(top, ivs){
           : null;
       }
     });
+
+    // ── CVD Spot: Binance + Bybit spot klines ──
+    // Binance Spot klines: campo 7=quoteVol, campo 9=takerBuyQuoteVol
+    const [bnCvdRes, bbCvdRes] = await Promise.all([
+      Promise.allSettled(top.map(t=>{
+        const sym = t.symbol.replace('USDT','');
+        return fj(`https://api.binance.com/api/v3/klines?symbol=${sym}USDT&interval=${iv}&limit=2`);
+      })),
+      Promise.allSettled(top.map(t=>{
+        const sym = t.symbol.replace('USDT','');
+        // Bybit spot klines: startTime/endTime not needed, limit=2
+        return fj(`https://api.bybit.com/v5/market/kline?category=spot&symbol=${sym}USDT&interval=${bybitIVoi}&limit=2`);
+      })),
+    ]);
+
+    top.forEach((t,i)=>{
+      const sym = t.symbol;
+      let cvdCur = 0, cvdPrev = 0, hasData = false;
+
+      // Binance Spot CVD
+      const bnC = bnCvdRes[i];
+      if(bnC.status==='fulfilled' && Array.isArray(bnC.value) && bnC.value.length>0){
+        const arr = bnC.value;
+        // CVD = takerBuyQuote*2 - quoteVol (delta do candle)
+        const calcDelta = (k) => parseFloat(k[9])*2 - parseFloat(k[7]);
+        cvdCur  += calcDelta(arr[arr.length-1]);
+        cvdPrev += arr.length>=2 ? calcDelta(arr[arr.length-2]) : 0;
+        hasData = true;
+      }
+
+      // Bybit Spot CVD
+      const bbC = bbCvdRes[i];
+      if(bbC.status==='fulfilled' && bbC.value?.result?.list?.length>0){
+        const arr = bbC.value.result.list; // mais recente primeiro
+        // Bybit kline: [startTime, open, high, low, close, volume, turnover]
+        // Bybit spot não tem taker buy separado — pula
+        // (Bybit spot kline não tem taker buy field, só futures tem)
+      }
+
+      if(hasData){
+        cache[`${sym}_cvd_${iv}`]      = cvdCur;
+        cache[`${sym}_cvd_${iv}_prev`] = cvdPrev;
+      }
+    });
   }
 }
 
-// Enriquece os 20 tokens atualmente visíveis na tabela (respeitando sort/filtro atual)
+// Enriquece os tokens candidatos a aparecer na tabela (respeitando busca/favoritos)
+// IMPORTANTE: filtros que dependem de dados do cache (OI/LSR/CVD/lateralização) NÃO
+// podem ser usados aqui para decidir quem enriquecer — o cache ainda pode estar vazio
+// nesse momento, e o filtro reprovaria todo mundo, criando um ciclo onde ninguém nunca
+// recebe dados. Por isso só aplicamos os filtros "seguros" (volume/funding, que não
+// dependem do cache de OI/LSR/CVD) e ampliamos o conjunto de candidatos quando há
+// filtro avançado de cache ativo, para dar chance a mais tokens de serem enriquecidos.
 async function enrichVisibleTop20(){
   const q=document.getElementById('search').value.trim().toUpperCase();
   let list = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
 
-  // Aplica filtros avançados igual ao render
   // Filtra favoritos
-  if(showFavOnly) filteredData = filteredData.filter(d=>favorites.includes(d.symbol));
-  const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir;
-  if(hasAdvFilter) list = list.filter(d => passAdvFilter(d));
+  if(showFavOnly) list = list.filter(d=>favorites.includes(d.symbol));
 
-  // Ordena igual ao render para pegar os mesmos 20 que aparecem na tela
+  // Só aplica os filtros que NÃO dependem do cache de OI/LSR/CVD (volume e funding
+  // já estão disponíveis antes do enrich). Os demais (oiDir/lsrDir/cvdDir)
+  // dependem de dados que só existirão depois do enrichAll, então são ignorados aqui.
+  if(advFilters.volumeOp && advFilters.volumeVal!==''){
+    const mult = parseFloat(advFilters.volumeMult || 1000000);
+    const threshold = parseFloat(advFilters.volumeVal) * mult;
+    list = list.filter(d=>{
+      if(d.volume==null) return false;
+      if(advFilters.volumeOp==='gt') return d.volume > threshold;
+      if(advFilters.volumeOp==='lt') return d.volume < threshold;
+      return true;
+    });
+  }
+  if(advFilters.fundingOp && advFilters.fundingVal!==''){
+    const threshold = parseFloat(advFilters.fundingVal);
+    list = list.filter(d=>{
+      const v = getAvgFunding(d.symbol);
+      if(v==null) return false;
+      if(advFilters.fundingOp==='gt') return v > threshold;
+      if(advFilters.fundingOp==='lt') return v < threshold;
+      return true;
+    });
+  }
+
+  // Ordena igual ao render para priorizar os mesmos candidatos que tendem a aparecer na tela
   list.sort((a,b)=>{
     let av=getVal(a,sortCol), bv=getVal(b,sortCol);
     if(av==null) av=sortDir==='desc'?-Infinity:Infinity;
@@ -751,15 +867,22 @@ async function enrichVisibleTop20(){
     return sortDir==='desc'?bv-av:av-bv;
   });
 
-  const top20 = list.slice(0,20).map(d=>({symbol:d._sym}));
-  await enrichAll(top20, activeIVs);
+  // Se há filtro que depende do cache (OI/LSR/CVD/lateralização), amplia o lote de
+  // enriquecimento para dar chance a mais tokens passarem depois que tiverem dados.
+  const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir);
+  const limit = needsCacheFilter ? Math.min(list.length, 60) : 20;
+
+  const top = list.slice(0, limit).map(d=>({symbol:d._sym}));
+  await enrichAll(top, activeIVs);
 }
 
 function buildCols(){
   const fixed = FIXED_COLS.filter(c=>c.always||activeCols.includes(c.id));
   const oiCols  = activeIVs.map(iv=>({id:`oi_${iv}`,  label:iv, group:'oi',  iv}));
   const lsrCols = activeIVs.map(iv=>({id:`lsr_${iv}`, label:iv, group:'lsr', iv}));
-  return [...fixed, ...oiCols, ...lsrCols];
+  const cvdCols = activeIVs.map(iv=>({id:`cvd_${iv}`, label:iv, group:'cvd', iv}));
+  const latCols = activeIVs.map(iv=>({id:`lat_${iv}`, label:iv, group:'lat', iv}));
+  return [...fixed, ...oiCols, ...lsrCols, ...cvdCols, ...latCols];
 }
 
 function buildHeader(cols){
@@ -770,6 +893,10 @@ function buildHeader(cols){
   grp+=`<th colspan="${fixedCount}"></th>`;
   if(oiCount)  grp+=`<th colspan="${oiCount}"  class="g-oi">Open Interest</th>`;
   if(lsrCount) grp+=`<th colspan="${lsrCount}" class="g-lsr">Long / Short Ratio</th>`;
+  const cvdCount = cols.filter(c=>c.group==='cvd').length;
+  if(cvdCount) grp+=`<th colspan="${cvdCount}" class="g-cvd">CVD Spot</th>`;
+  const latCount = cols.filter(c=>c.group==='lat').length;
+  if(latCount) grp+=`<th colspan="${latCount}" class="g-lat">Lateralização</th>`;
   grp+='</tr>';
   let sub='<tr class="sub">';
   for(const c of cols){
@@ -777,14 +904,62 @@ function buildHeader(cols){
     const cls=isSorted?(sortDir==='asc'?'sa':'sd'):'';
     const lsrCols = cols.filter(x=>x.group==='lsr');
     const oiCols  = cols.filter(x=>x.group==='oi');
+    const cvdCols = cols.filter(x=>x.group==='cvd');
+    const latCols = cols.filter(x=>x.group==='lat');
     const firstLsr = lsrCols.length>0 && c===lsrCols[0];
     const lastOi   = oiCols.length>0  && c===oiCols[oiCols.length-1];
+    const firstCvd = cvdCols.length>0 && c===cvdCols[0];
+    const firstLat = latCols.length>0 && c===latCols[0];
     const sep = firstLsr ? ' style="border-left:2px solid var(--accent2);padding-left:20px"'
-              : lastOi   ? ' style="padding-right:20px"' : '';
+              : lastOi   ? ' style="padding-right:20px"'
+              : firstCvd ? ' style="border-left:2px solid #f97316;padding-left:20px"'
+              : firstLat ? ' style="border-left:2px solid #facc15;padding-left:20px"' : '';
     sub+=`<th class="${cls}" onclick="setSort('${c.id}')"${sep}>${c.label}<span class="si2"></span></th>`;
   }
   sub+='</tr>';
   document.getElementById('th').innerHTML=grp+sub;
+}
+
+// Calcula se um token está em provável lateralização NAQUELE timeframe específico.
+// Critérios isolados por TF: OI estável (var% pequena), LSR perto de 1.0, CVD sem
+// direção forte (perto do anterior). Funding não tem timeframe, então conta igual
+// para todas as colunas — é um critério extra de contexto, não decisivo isolado.
+// Retorna {lat:boolean, score, total} ou null se não há dados suficientes pro TF.
+function checkLatTF(d, iv){
+  let score=0, total=0;
+
+  const oiCur  = cache[`${d._sym}_oi_${iv}`];
+  const oiPrev = cache[`${d._sym}_oi_${iv}_prev`];
+  if(oiCur!=null && oiPrev!=null && oiPrev!==0){
+    const oiChg = Math.abs((oiCur-oiPrev)/oiPrev*100);
+    if(oiChg < 3) score++;
+    total++;
+  }
+
+  const lsr = cache[`${d._sym}_lsr_${iv}`];
+  if(lsr!=null){
+    if(lsr>=0.85 && lsr<=1.15) score++;
+    total++;
+  }
+
+  const cvdCur  = cache[`${d._sym}_cvd_${iv}`];
+  const cvdPrev = cache[`${d._sym}_cvd_${iv}_prev`];
+  if(cvdCur!=null && cvdPrev!=null){
+    // sem tendência forte: delta do CVD pequeno relativamente ao próprio valor anterior
+    const base = Math.abs(cvdPrev) > 0 ? Math.abs(cvdPrev) : Math.abs(cvdCur);
+    const cvdChg = base>0 ? Math.abs(cvdCur-cvdPrev)/base*100 : 0;
+    if(cvdChg < 15) score++;
+    total++;
+  }
+
+  const funding = getAvgFunding(d.symbol);
+  if(funding!=null){
+    if(Math.abs(funding) < 0.02) score++;
+    total++;
+  }
+
+  if(total===0) return null;
+  return { lat: score >= Math.ceil(total/2), score, total };
 }
 
 function getVal(d, colId){
@@ -796,6 +971,16 @@ function getVal(d, colId){
     const iv=colId.replace('lsr_','');
     return cache[`${d._sym}_lsr_${iv}`]??null;
   }
+  if(colId.startsWith('cvd_')){
+    const iv=colId.replace('cvd_','');
+    return cache[`${d._sym}_cvd_${iv}`]??null;
+  }
+  if(colId.startsWith('lat_')){
+    const iv=colId.replace('lat_','');
+    const r = checkLatTF(d, iv);
+    if(r==null) return null;
+    return r.lat ? 1 : 0;
+  }
   if(colId==='funding') return getAvgFunding(d.symbol);
   return d[colId]??null;
 }
@@ -806,7 +991,7 @@ function render(){
   // Aplica filtros avançados
   // Filtra favoritos
   if(showFavOnly) filteredData = filteredData.filter(d=>favorites.includes(d.symbol));
-  const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir;
+  const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir;
   if(hasAdvFilter) filteredData = filteredData.filter(d => passAdvFilter(d));
 
   // Ordena
@@ -824,6 +1009,7 @@ function render(){
   buildHeader(cols);
   renderRows(cols, displayData);
   updateStats();
+  syncTopScroll();
 }
 
 function renderRows(cols, data){
@@ -835,10 +1021,16 @@ function renderRows(cols, data){
     for(const c of cols){
       const lsrCols = cols.filter(x=>x.group==='lsr');
       const oiCols  = cols.filter(x=>x.group==='oi');
+      const cvdCols = cols.filter(x=>x.group==='cvd');
+      const latCols = cols.filter(x=>x.group==='lat');
       const firstLsr = lsrCols.length>0 && c===lsrCols[0];
       const lastOi   = oiCols.length>0  && c===oiCols[oiCols.length-1];
+      const firstCvd = cvdCols.length>0 && c===cvdCols[0];
+      const firstLat = latCols.length>0 && c===latCols[0];
       const sep = firstLsr ? ' style="border-left:2px solid var(--accent2);padding-left:20px"'
-                : lastOi   ? ' style="padding-right:20px"' : '';
+                : lastOi   ? ' style="padding-right:20px"'
+                : firstCvd ? ' style="border-left:2px solid #f97316;padding-left:20px"'
+                : firstLat ? ' style="border-left:2px solid #facc15;padding-left:20px"' : '';
       html+=`<td${sep}>${cell(c.id,d)}</td>`;
     }
     html+='</tr>';
@@ -847,6 +1039,15 @@ function renderRows(cols, data){
 }
 
 function cell(id,d){
+  if(id.startsWith('lat_')){
+    const iv=id.replace('lat_','');
+    const r=checkLatTF(d, iv);
+    if(r==null) return '<span class="neu">—</span>';
+    const tip = `score ${r.score}/${r.total} critérios`;
+    return r.lat
+      ? `<span title="${tip}" style="cursor:help">↔️</span>`
+      : `<span title="${tip}" style="cursor:help;opacity:.35">—</span>`;
+  }
   if(id.startsWith('oi_')){
     const v=getVal(d,id);
     if(v==null) return '<span class="neu">—</span>';
@@ -856,6 +1057,17 @@ function cell(id,d){
     if(prev!=null){
       cls = v>prev ? 'pos' : v<prev ? 'neg' : '';
     }
+    const pct = (prev!=null && prev!==0) ? ((v-prev)/prev*100) : null;
+    const pctStr = pct!=null ? ` <span style="font-size:10px;opacity:.7">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
+    return `<span class="num ${cls}">${fmtK(v)}</span>${pctStr}`;
+  }
+  if(id.startsWith('cvd_')){
+    const v=getVal(d,id);
+    if(v==null) return '<span class="neu">—</span>';
+    const iv=id.replace('cvd_','');
+    const prev=cache[`${d._sym}_cvd_${iv}_prev`];
+    let cls='';
+    if(prev!=null) cls = v>prev ? 'pos' : v<prev ? 'neg' : '';
     const pct = (prev!=null && prev!==0) ? ((v-prev)/prev*100) : null;
     const pctStr = pct!=null ? ` <span style="font-size:10px;opacity:.7">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
     return `<span class="num ${cls}">${fmtK(v)}</span>${pctStr}`;
@@ -945,7 +1157,9 @@ async function toggleIV(id,btn){
       if(bv==null) bv=sortDir==='desc'?-Infinity:Infinity;
       return sortDir==='desc'?bv-av:av-bv;
     });
-    const top20 = list.slice(0,20).map(d=>({symbol:d._sym}));
+    const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir);
+    const limit = needsCacheFilter ? Math.min(list.length, 60) : 20;
+    const top20 = list.slice(0,limit).map(d=>({symbol:d._sym}));
     await enrichAll(top20,[id]);
   }
   saveC(); render();
@@ -1010,7 +1224,7 @@ async function silentUpdateOI(){
     const d = allData.find(x=>x.symbol===sym);
     if(!d) continue;
     cols.forEach((c,i)=>{
-      if((c.id.startsWith('oi_')||c.id.startsWith('lsr_')) && tds[i]){
+      if((c.id.startsWith('oi_')||c.id.startsWith('lsr_')||c.id.startsWith('cvd_')) && tds[i]){
         tds[i].innerHTML = cell(c.id, d);
       }
     });
@@ -1055,6 +1269,34 @@ async function silentUpdateFull(){
     }
   }catch(e){}
 }
+
+// Barra de scroll horizontal extra, acima da tabela, sincronizada com o scroll real
+function syncTopScroll(){
+  const tw = document.getElementById('tw');
+  const inner = document.getElementById('topScrollInner');
+  const tbl = document.getElementById('tbl');
+  if(!tw || !inner || !tbl) return;
+  inner.style.width = tbl.scrollWidth + 'px';
+}
+(function setupTopScrollSync(){
+  const topScroll = document.getElementById('topScroll');
+  const tw = document.getElementById('tw');
+  if(!topScroll || !tw) return;
+  let syncing = false;
+  topScroll.addEventListener('scroll', ()=>{
+    if(syncing) return;
+    syncing = true;
+    tw.scrollLeft = topScroll.scrollLeft;
+    syncing = false;
+  });
+  tw.addEventListener('scroll', ()=>{
+    if(syncing) return;
+    syncing = true;
+    topScroll.scrollLeft = tw.scrollLeft;
+    syncing = false;
+  });
+  window.addEventListener('resize', syncTopScroll);
+})();
 
 loadC();
 buildColToggles();
@@ -1273,6 +1515,21 @@ const COND_COLS = [
   {id:'lsr_1h',     label:'LSR 1h'},
   {id:'lsr_4h',     label:'LSR 4h'},
   {id:'lsr_1d',     label:'LSR 1d'},
+  {id:'cvd_5m',     label:'CVD Spot 5m'},
+  {id:'cvd_15m',    label:'CVD Spot 15m'},
+  {id:'cvd_1h',     label:'CVD Spot 1h'},
+  {id:'cvd_4h',     label:'CVD Spot 4h'},
+  {id:'cvd_1d',     label:'CVD Spot 1d'},
+  {id:'cvd_dir_5m',  label:'CVD Spot 5m direção'},
+  {id:'cvd_dir_15m', label:'CVD Spot 15m direção'},
+  {id:'cvd_dir_1h',  label:'CVD Spot 1h direção'},
+  {id:'cvd_dir_4h',  label:'CVD Spot 4h direção'},
+  {id:'cvd_dir_1d',  label:'CVD Spot 1d direção'},
+  {id:'lat_5m',  label:'⟷ Lateralização 5m'},
+  {id:'lat_15m', label:'⟷ Lateralização 15m'},
+  {id:'lat_1h',  label:'⟷ Lateralização 1h'},
+  {id:'lat_4h',  label:'⟷ Lateralização 4h'},
+  {id:'lat_1d',  label:'⟷ Lateralização 1d'},
 ];
 
 const OPERATORS = [
@@ -1315,14 +1572,17 @@ function addCondRow(cond){
   div.className = 'cond-row';
   const colOpts = COND_COLS.map(c=>`<option value="${c.id}" ${cond&&cond.col===c.id?'selected':''}>${c.label}</option>`).join('');
   const isDir = cond && cond.col && cond.col.startsWith('oi_dir_');
+  const isLat = cond && cond.col && cond.col.startsWith('lat_');
   const opOpts = (isDir
     ? [{id:'up',label:'↑ subindo'},{id:'dn',label:'↓ caindo'}]
+    : isLat
+    ? [{id:'is',label:'↔️ está lateralizando'},{id:'isnt',label:'não está lateralizando'}]
     : OPERATORS
   ).map(o=>`<option value="${o.id}" ${cond&&cond.op===o.id?'selected':''}>${o.label}</option>`).join('');
   div.innerHTML = `
     <select class="cond-col" onchange="updateCondRow(this)">${colOpts}</select>
     <select class="cond-op">${opOpts}</select>
-    <input class="cond-val" type="number" step="any" placeholder="Valor" value="${cond&&cond.val!=null?cond.val:''}" style="${isDir?'display:none':''}">
+    <input class="cond-val" type="number" step="any" placeholder="Valor" value="${cond&&cond.val!=null?cond.val:''}" style="${(isDir||isLat)?'display:none':''}">
     <button class="cond-del" onclick="this.parentElement.remove()">✕</button>`;
   list.appendChild(div);
 }
@@ -1332,8 +1592,12 @@ function updateCondRow(sel){
   const op  = row.querySelector('.cond-op');
   const val = row.querySelector('.cond-val');
   const isDir = sel.value.startsWith('oi_dir_');
+  const isLat = sel.value.startsWith('lat_');
   if(isDir){
     op.innerHTML = [{id:'up',label:'↑ subindo'},{id:'dn',label:'↓ caindo'}].map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
+    val.style.display = 'none'; val.value = '';
+  } else if(isLat){
+    op.innerHTML = [{id:'is',label:'↔️ está lateralizando'},{id:'isnt',label:'não está lateralizando'}].map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
     val.style.display = 'none'; val.value = '';
   } else {
     op.innerHTML = OPERATORS.map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
@@ -1413,8 +1677,25 @@ function evalAlert(alertObj, d){
       continue;
     } else if(col.startsWith('oi_')){
       v = cache[`${d._sym}_oi_${col.replace('oi_','')}`];
+    } else if(col.startsWith('cvd_dir_')){
+      const iv=col.replace('cvd_dir_','');
+      const cur  = cache[`${d._sym}_cvd_${iv}`];
+      const prev = cache[`${d._sym}_cvd_${iv}_prev`];
+      if(cur==null||prev==null) return false;
+      if(op==='up'&&cur<=prev) return false;
+      if(op==='dn'&&cur>=prev) return false;
+      continue;
+    } else if(col.startsWith('cvd_')){
+      v = cache[`${d._sym}_cvd_${col.replace('cvd_','')}`];
     } else if(col.startsWith('lsr_')){
       v = cache[`${d._sym}_lsr_${col.replace('lsr_','')}`];
+    } else if(col.startsWith('lat_')){
+      const iv=col.replace('lat_','');
+      const r = checkLatTF(d, iv);
+      if(r==null) return false;
+      if(op==='is'   && !r.lat) return false;
+      if(op==='isnt' &&  r.lat) return false;
+      continue;
     }
     if(v==null) return false;
     if(op==='gt' &&!(v> val)) return false;
@@ -1422,6 +1703,7 @@ function evalAlert(alertObj, d){
     if(op==='gte'&&!(v>=val)) return false;
     if(op==='lte'&&!(v<=val)) return false;
   }
+
   return true;
 }
 
@@ -1497,14 +1779,6 @@ async function openTVMenu(menuId, sym, e){
 
   menu.innerHTML = '<div class="tv-menu-title">Verificando...</div>';
 
-  const exchanges = [
-    {name:'Binance', symbol:`BINANCE:${sym}USDT.P`},
-    {name:'Bybit',   symbol:`BYBIT:${sym}USDT.P`},
-    {name:'Bitget',  symbol:`BITGET:${sym}USDT.P`},
-    {name:'LBank',   symbol:`LBANK:${sym}USDT`},
-    {name:'BingX',   symbol:`BINGX:${sym}USDT.PS`},
-  ];
-
   // Busca o símbolo na API de busca do TradingView via proxy
   const exchanges = [
     {name:'Binance', symbol:`BINANCE:${sym}USDT.P`},
@@ -1562,5 +1836,5 @@ function renderTVMenu(menu, available){
     + available.map(ex=>`<a href="${ex.url}" target="_blank" rel="noopener">${ex.name}</a>`).join('');
 }
 </script>
+
 </body>
-</html>
