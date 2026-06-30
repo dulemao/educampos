@@ -36,6 +36,9 @@
   .sbar span{color:var(--text);font-weight:600}
   .tw{overflow-x:auto;padding:16px 20px}
   table{width:100%;border-collapse:collapse;min-width:500px}
+  .stick-col{position:sticky;left:0;z-index:5;background:var(--surface)}
+  thead .stick-col{z-index:15}
+  tbody tr:hover .stick-col{background:var(--surface2)}
   thead tr.grp th{padding:6px 12px 2px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:none;text-align:center;cursor:default}
   thead tr.grp th.g-oi{color:var(--accent);border-top:2px solid var(--accent)}
   thead tr.grp th.g-lsr{color:var(--accent2);border-top:2px solid var(--accent2)}
@@ -153,6 +156,7 @@
   /* ── CVD ── */
   thead tr.grp th.g-cvd{color:#f97316;border-top:2px solid #f97316;background:rgba(249,115,22,.03)}
   thead tr.grp th.g-lat{color:#facc15;border-top:2px solid #facc15;background:rgba(250,204,21,.03)}
+  thead tr.grp th.g-volrel{color:#38bdf8;border-top:2px solid #38bdf8;background:rgba(56,189,248,.03)}
 
 </style>
 </head>
@@ -240,6 +244,26 @@
     </select>
   </div>
 
+  <div class="fbar-group" id="fg-lat">
+    <label>⟷ Lateralização (conjunto)</label>
+    <select id="fLatMode" onchange="applyAdvFilters()">
+      <option value="">--</option>
+      <option value="on">⟷ maioria lateralizando</option>
+      <option value="all">⟷⟷ todos lateralizando</option>
+    </select>
+  </div>
+
+  <div class="fbar-group" id="fg-volrel">
+    <label>Volume Relativo (conjunto)</label>
+    <select id="fVolrelDir" onchange="applyAdvFilters()">
+      <option value="">--</option>
+      <option value="up">↑ maioria subindo</option>
+      <option value="dn">↓ maioria caindo</option>
+      <option value="all_up">↑↑ todos subindo</option>
+      <option value="all_dn">↓↓ todos caindo</option>
+    </select>
+  </div>
+
   <button class="fbar-clear" onclick="clearAdvFilters()">✕ Limpar</button>
 </div>
 
@@ -274,7 +298,9 @@ let sortCol    = 'volume';
 let sortDir    = 'desc';
 let allData    = [];
 let filteredData = [];
-let advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'', cvdDir:'' };
+let advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'', cvdDir:'', latMode:'', volrelDir:'' };
+let volrelSource = 'spot'; // 'spot' | 'fut' | 'both'
+function setVolrelSource(v){ volrelSource = v; render(); }
 let favorites = JSON.parse(localStorage.getItem('perpFavorites')||'[]');
 let showFavOnly = false;
 
@@ -308,6 +334,8 @@ function applyAdvFilters(){
   advFilters.oiDir      = document.getElementById('fOiDir').value;
   advFilters.lsrDir     = document.getElementById('fLsrDir').value;
   advFilters.cvdDir     = document.getElementById('fCvdDir').value;
+  advFilters.latMode    = document.getElementById('fLatMode').value;
+  advFilters.volrelDir  = document.getElementById('fVolrelDir').value;
   
   // Destaca grupos ativos
   document.getElementById('fg-volume').classList.toggle('active', !!(advFilters.volumeOp && advFilters.volumeVal!==''));
@@ -315,6 +343,8 @@ function applyAdvFilters(){
   document.getElementById('fg-oi').classList.toggle('active', !!advFilters.oiDir);
   document.getElementById('fg-lsr').classList.toggle('active', !!advFilters.lsrDir);
   document.getElementById('fg-cvd').classList.toggle('active', !!advFilters.cvdDir);
+  document.getElementById('fg-lat').classList.toggle('active', !!advFilters.latMode);
+  document.getElementById('fg-volrel').classList.toggle('active', !!advFilters.volrelDir);
   
   render();
 }
@@ -328,12 +358,16 @@ function clearAdvFilters(){
   document.getElementById('fOiDir').value='';
   document.getElementById('fLsrDir').value='';
   document.getElementById('fCvdDir').value='';
-  advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'', cvdDir:'' };
+  document.getElementById('fLatMode').value='';
+  document.getElementById('fVolrelDir').value='';
+  advFilters = { volumeOp:'', volumeVal:'', fundingOp:'', fundingVal:'', oiDir:'', lsrDir:'', cvdDir:'', latMode:'', volrelDir:'' };
   document.getElementById('fg-volume').classList.remove('active');
   document.getElementById('fg-funding').classList.remove('active');
   document.getElementById('fg-oi').classList.remove('active');
   document.getElementById('fg-lsr').classList.remove('active');
   document.getElementById('fg-cvd').classList.remove('active');
+  document.getElementById('fg-lat').classList.remove('active');
+  document.getElementById('fg-volrel').classList.remove('active');
   render();
 }
 
@@ -421,9 +455,44 @@ function passAdvFilter(d){
     if(advFilters.cvdDir==='all_dn' && !(dns === total)) return false;
   }
 
+  // Lateralização (conjunto dos timeframes ativos) — usa checkLatTF por TF
+  if(advFilters.latMode){
+    const activeIvsNow = ivs.filter(iv => activeIVs.includes(iv));
+    const results = activeIvsNow.map(iv=>checkLatTF(d, iv)).filter(r=>r!==null);
+
+    if(results.length===0) return false;
+    const latCount = results.filter(r=>r.lat).length;
+    const total = results.length;
+
+    if(advFilters.latMode==='on'  && !(latCount > total/2)) return false;
+    if(advFilters.latMode==='all' && !(latCount === total)) return false;
+  }
+
+  // Volume Relativo (conjunto dos timeframes ativos) — acima de 1x = "subindo" (volume
+  // acima do normal do token), abaixo de 1x = "caindo" (volume abaixo do normal)
+  if(advFilters.volrelDir){
+    const activeIvsNow = ivs.filter(iv => activeIVs.includes(iv));
+    const results = activeIvsNow.map(iv=>{
+      const v = getVolRel(d, iv);
+      if(v==null) return null;
+      return v > 1 ? 'up' : v < 1 ? 'dn' : 'flat';
+    }).filter(r=>r!==null);
+
+    if(results.length===0) return false;
+    const ups = results.filter(r=>r==='up').length;
+    const dns = results.filter(r=>r==='dn').length;
+    const total = results.length;
+
+    if(advFilters.volrelDir==='up'     && !(ups > total/2)) return false;
+    if(advFilters.volrelDir==='dn'     && !(dns > total/2)) return false;
+    if(advFilters.volrelDir==='all_up' && !(ups === total)) return false;
+    if(advFilters.volrelDir==='all_dn' && !(dns === total)) return false;
+  }
+
   return true;
 }
 let cache      = {}; 
+let volrelHist = {}; // histórico curto de Volume Relativo por símbolo/timeframe, p/ calcular momentum
 let exLoaded   = {};
 
 function saveC(){ try{localStorage.setItem(SK,JSON.stringify({activeCols,activeIVs,sortCol,sortDir}))}catch(e){} }
@@ -688,7 +757,7 @@ async function loadData(){
     // Se há filtro que depende do cache (OI/LSR/CVD/lateralização), o cache ainda
     // está vazio aqui — renderizar agora aplicaria o filtro e reprovaria todo mundo.
     // Nesse caso, pula o render provisório e só renderiza depois do enrich.
-    const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir);
+    const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir);
     if(!needsCacheFilter) render();
     await enrichVisibleTop20();
     render();
@@ -777,15 +846,20 @@ async function enrichAll(top, ivs){
 
     // ── CVD Spot: Binance + Bybit spot klines ──
     // Binance Spot klines: campo 7=quoteVol, campo 9=takerBuyQuoteVol
-    const [bnCvdRes, bbCvdRes] = await Promise.all([
+    const [bnCvdRes, bbCvdRes, bnFutKlinesRes] = await Promise.all([
       Promise.allSettled(top.map(t=>{
         const sym = t.symbol.replace('USDT','');
-        return fj(`https://api.binance.com/api/v3/klines?symbol=${sym}USDT&interval=${iv}&limit=2`);
+        return fj(`https://api.binance.com/api/v3/klines?symbol=${sym}USDT&interval=${iv}&limit=21`);
       })),
       Promise.allSettled(top.map(t=>{
         const sym = t.symbol.replace('USDT','');
         // Bybit spot klines: startTime/endTime not needed, limit=2
         return fj(`https://api.bybit.com/v5/market/kline?category=spot&symbol=${sym}USDT&interval=${bybitIVoi}&limit=2`);
+      })),
+      // Klines de futuros, usado como fonte alternativa de Volume Relativo
+      // (cobre tokens sem par spot na Binance; CVD continua só com spot)
+      Promise.allSettled(top.map(t=>{
+        return fj(`https://fapi.binance.com/fapi/v1/klines?symbol=${t.symbol}&interval=${iv}&limit=21`);
       })),
     ]);
 
@@ -817,6 +891,37 @@ async function enrichAll(top, ivs){
         cache[`${sym}_cvd_${iv}`]      = cvdCur;
         cache[`${sym}_cvd_${iv}_prev`] = cvdPrev;
       }
+
+      // Volume relativo (fonte SPOT) — usa as velas extras já trazidas na mesma busca do CVD
+      if(bnC.status==='fulfilled' && Array.isArray(bnC.value) && bnC.value.length>1){
+        const arr = bnC.value;
+        const curVol = parseFloat(arr[arr.length-1][7]);
+        const histArr = arr.slice(0, arr.length-1);
+        if(histArr.length>0){
+          const avgVol = histArr.reduce((s,k)=>s+parseFloat(k[7]),0)/histArr.length;
+          if(avgVol>0){
+            cache[`${sym}_volrel_spot_${iv}`] = curVol/avgVol;
+          }
+        }
+      }
+
+      // Volume relativo (fonte FUTUROS) — cobre todos os tokens, inclusive sem par spot
+      const bnF = bnFutKlinesRes[i];
+      if(bnF.status==='fulfilled' && Array.isArray(bnF.value) && bnF.value.length>1){
+        const arr = bnF.value;
+        const curVol = parseFloat(arr[arr.length-1][7]);
+        const histArr = arr.slice(0, arr.length-1);
+        if(histArr.length>0){
+          const avgVol = histArr.reduce((s,k)=>s+parseFloat(k[7]),0)/histArr.length;
+          if(avgVol>0){
+            cache[`${sym}_volrel_fut_${iv}`] = curVol/avgVol;
+          }
+        }
+      }
+
+      // Registra no histórico curto o valor que está sendo efetivamente usado (de acordo
+      // com a fonte selecionada pelo usuário), para permitir calcular o momentum depois.
+      recordVolrelHist(sym, iv, getVolRel({_sym:sym}, iv));
     });
   }
 }
@@ -869,7 +974,7 @@ async function enrichVisibleTop20(){
 
   // Se há filtro que depende do cache (OI/LSR/CVD/lateralização), amplia o lote de
   // enriquecimento para dar chance a mais tokens passarem depois que tiverem dados.
-  const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir);
+  const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir);
   const limit = needsCacheFilter ? Math.min(list.length, 60) : 20;
 
   const top = list.slice(0, limit).map(d=>({symbol:d._sym}));
@@ -882,7 +987,8 @@ function buildCols(){
   const lsrCols = activeIVs.map(iv=>({id:`lsr_${iv}`, label:iv, group:'lsr', iv}));
   const cvdCols = activeIVs.map(iv=>({id:`cvd_${iv}`, label:iv, group:'cvd', iv}));
   const latCols = activeIVs.map(iv=>({id:`lat_${iv}`, label:iv, group:'lat', iv}));
-  return [...fixed, ...oiCols, ...lsrCols, ...cvdCols, ...latCols];
+  const volrelCols = activeIVs.map(iv=>({id:`volrel_${iv}`, label:iv, group:'volrel', iv}));
+  return [...fixed, ...oiCols, ...lsrCols, ...cvdCols, ...latCols, ...volrelCols];
 }
 
 function buildHeader(cols){
@@ -890,30 +996,40 @@ function buildHeader(cols){
   const oiCount    = cols.filter(c=>c.group==='oi').length;
   const lsrCount   = cols.filter(c=>c.group==='lsr').length;
   let grp='<tr class="grp">';
-  grp+=`<th colspan="${fixedCount}"></th>`;
+  grp+=`<th class="stick-col"></th>`;
+  grp+=`<th colspan="${fixedCount-1}"></th>`;
   if(oiCount)  grp+=`<th colspan="${oiCount}"  class="g-oi">Open Interest</th>`;
   if(lsrCount) grp+=`<th colspan="${lsrCount}" class="g-lsr">Long / Short Ratio</th>`;
   const cvdCount = cols.filter(c=>c.group==='cvd').length;
   if(cvdCount) grp+=`<th colspan="${cvdCount}" class="g-cvd">CVD Spot</th>`;
   const latCount = cols.filter(c=>c.group==='lat').length;
   if(latCount) grp+=`<th colspan="${latCount}" class="g-lat">Lateralização</th>`;
+  const volrelCount = cols.filter(c=>c.group==='volrel').length;
+  if(volrelCount) grp+=`<th colspan="${volrelCount}" class="g-volrel">Volume Relativo <select onclick="event.stopPropagation()" onchange="setVolrelSource(this.value)" style="font-size:10px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:4px;margin-left:4px;cursor:pointer">
+      <option value="spot" ${volrelSource==='spot'?'selected':''}>Spot</option>
+      <option value="fut" ${volrelSource==='fut'?'selected':''}>Futuros</option>
+      <option value="both" ${volrelSource==='both'?'selected':''}>Ambos</option>
+    </select></th>`;
   grp+='</tr>';
   let sub='<tr class="sub">';
   for(const c of cols){
     const isSorted=sortCol===c.id;
-    const cls=isSorted?(sortDir==='asc'?'sa':'sd'):'';
+    const cls=(isSorted?(sortDir==='asc'?'sa':'sd'):'') + (c.id==='symbol' ? ' stick-col' : '');
     const lsrCols = cols.filter(x=>x.group==='lsr');
     const oiCols  = cols.filter(x=>x.group==='oi');
     const cvdCols = cols.filter(x=>x.group==='cvd');
     const latCols = cols.filter(x=>x.group==='lat');
+    const volrelCols = cols.filter(x=>x.group==='volrel');
     const firstLsr = lsrCols.length>0 && c===lsrCols[0];
     const lastOi   = oiCols.length>0  && c===oiCols[oiCols.length-1];
     const firstCvd = cvdCols.length>0 && c===cvdCols[0];
     const firstLat = latCols.length>0 && c===latCols[0];
+    const firstVolrel = volrelCols.length>0 && c===volrelCols[0];
     const sep = firstLsr ? ' style="border-left:2px solid var(--accent2);padding-left:20px"'
               : lastOi   ? ' style="padding-right:20px"'
               : firstCvd ? ' style="border-left:2px solid #f97316;padding-left:20px"'
-              : firstLat ? ' style="border-left:2px solid #facc15;padding-left:20px"' : '';
+              : firstLat ? ' style="border-left:2px solid #facc15;padding-left:20px"'
+              : firstVolrel ? ' style="border-left:2px solid #38bdf8;padding-left:20px"' : '';
     sub+=`<th class="${cls}" onclick="setSort('${c.id}')"${sep}>${c.label}<span class="si2"></span></th>`;
   }
   sub+='</tr>';
@@ -925,6 +1041,43 @@ function buildHeader(cols){
 // direção forte (perto do anterior). Funding não tem timeframe, então conta igual
 // para todas as colunas — é um critério extra de contexto, não decisivo isolado.
 // Retorna {lat:boolean, score, total} ou null se não há dados suficientes pro TF.
+// Lê o Volume Relativo de acordo com a fonte escolhida pelo usuário (spot/futuros/ambos)
+function getVolRel(d, iv){
+  const spot = cache[`${d._sym}_volrel_spot_${iv}`];
+  const fut  = cache[`${d._sym}_volrel_fut_${iv}`];
+  if(volrelSource==='spot') return spot ?? null;
+  if(volrelSource==='fut')  return fut  ?? null;
+  // 'both': prioriza spot quando existir, senão usa futuros
+  return spot ?? fut ?? null;
+}
+
+// Registra o valor atual de Volume Relativo no histórico curto (mantém só as últimas
+// HIST_LEN leituras por símbolo/timeframe), para permitir calcular o momentum depois.
+const VOLREL_HIST_LEN = 4; // ~4 leituras de 5s = 20s de janela de comparação
+function recordVolrelHist(sym, iv, value){
+  if(value==null) return;
+  const key = `${sym}_${iv}`;
+  if(!volrelHist[key]) volrelHist[key] = [];
+  volrelHist[key].push(value);
+  if(volrelHist[key].length > VOLREL_HIST_LEN) volrelHist[key].shift();
+}
+
+// Calcula o momentum do Volume Relativo: compara a leitura mais antiga guardada com a
+// mais recente. Retorna 'up' (subindo), 'dn' (descendo), 'flat' (estável) ou null
+// (sem histórico suficiente ainda).
+function getVolrelMomentum(d, iv){
+  const key = `${d._sym}_${iv}`;
+  const hist = volrelHist[key];
+  if(!hist || hist.length<2) return null;
+  const oldest = hist[0];
+  const newest = hist[hist.length-1];
+  if(oldest==null || newest==null || oldest===0) return null;
+  const chgPct = (newest-oldest)/oldest*100;
+  if(chgPct > 15) return 'up';
+  if(chgPct < -15) return 'dn';
+  return 'flat';
+}
+
 function checkLatTF(d, iv){
   let score=0, total=0;
 
@@ -981,6 +1134,10 @@ function getVal(d, colId){
     if(r==null) return null;
     return r.lat ? 1 : 0;
   }
+  if(colId.startsWith('volrel_')){
+    const iv=colId.replace('volrel_','');
+    return getVolRel(d, iv);
+  }
   if(colId==='funding') return getAvgFunding(d.symbol);
   return d[colId]??null;
 }
@@ -991,7 +1148,7 @@ function render(){
   // Aplica filtros avançados
   // Filtra favoritos
   if(showFavOnly) filteredData = filteredData.filter(d=>favorites.includes(d.symbol));
-  const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir;
+  const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir;
   if(hasAdvFilter) filteredData = filteredData.filter(d => passAdvFilter(d));
 
   // Ordena
@@ -1023,15 +1180,19 @@ function renderRows(cols, data){
       const oiCols  = cols.filter(x=>x.group==='oi');
       const cvdCols = cols.filter(x=>x.group==='cvd');
       const latCols = cols.filter(x=>x.group==='lat');
+      const volrelCols = cols.filter(x=>x.group==='volrel');
       const firstLsr = lsrCols.length>0 && c===lsrCols[0];
       const lastOi   = oiCols.length>0  && c===oiCols[oiCols.length-1];
       const firstCvd = cvdCols.length>0 && c===cvdCols[0];
       const firstLat = latCols.length>0 && c===latCols[0];
+      const firstVolrel = volrelCols.length>0 && c===volrelCols[0];
       const sep = firstLsr ? ' style="border-left:2px solid var(--accent2);padding-left:20px"'
                 : lastOi   ? ' style="padding-right:20px"'
                 : firstCvd ? ' style="border-left:2px solid #f97316;padding-left:20px"'
-                : firstLat ? ' style="border-left:2px solid #facc15;padding-left:20px"' : '';
-      html+=`<td${sep}>${cell(c.id,d)}</td>`;
+                : firstLat ? ' style="border-left:2px solid #facc15;padding-left:20px"'
+                : firstVolrel ? ' style="border-left:2px solid #38bdf8;padding-left:20px"' : '';
+      const stickCls = c.id==='symbol' ? ' class="stick-col"' : '';
+      html+=`<td${stickCls}${sep}>${cell(c.id,d)}</td>`;
     }
     html+='</tr>';
   }
@@ -1039,6 +1200,17 @@ function renderRows(cols, data){
 }
 
 function cell(id,d){
+  if(id.startsWith('volrel_')){
+    const iv=id.replace('volrel_','');
+    const v = getVolRel(d, iv);
+    if(v==null) return '<span class="neu">—</span>';
+    const cls = v>=2 ? 'pos' : v<0.5 ? 'neg' : '';
+    const mom = getVolrelMomentum(d, iv);
+    const momIcon = mom==='up' ? '<span style="color:#34d399;font-size:10px" title="subindo rápido">▲</span>'
+                  : mom==='dn' ? '<span style="color:#f87171;font-size:10px" title="descendo rápido">▼</span>'
+                  : '';
+    return `<span class="num ${cls}">${v.toFixed(1)}x</span> ${momIcon}`;
+  }
   if(id.startsWith('lat_')){
     const iv=id.replace('lat_','');
     const r=checkLatTF(d, iv);
@@ -1157,7 +1329,7 @@ async function toggleIV(id,btn){
       if(bv==null) bv=sortDir==='desc'?-Infinity:Infinity;
       return sortDir==='desc'?bv-av:av-bv;
     });
-    const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir);
+    const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir);
     const limit = needsCacheFilter ? Math.min(list.length, 60) : 20;
     const top20 = list.slice(0,limit).map(d=>({symbol:d._sym}));
     await enrichAll(top20,[id]);
@@ -1224,7 +1396,7 @@ async function silentUpdateOI(){
     const d = allData.find(x=>x.symbol===sym);
     if(!d) continue;
     cols.forEach((c,i)=>{
-      if((c.id.startsWith('oi_')||c.id.startsWith('lsr_')||c.id.startsWith('cvd_')||c.id.startsWith('lat_')) && tds[i]){
+      if((c.id.startsWith('oi_')||c.id.startsWith('lsr_')||c.id.startsWith('cvd_')||c.id.startsWith('lat_')||c.id.startsWith('volrel_')) && tds[i]){
         tds[i].innerHTML = cell(c.id, d);
       }
     });
