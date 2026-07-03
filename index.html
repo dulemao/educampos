@@ -935,33 +935,55 @@ async function enrichAll(top, ivs){
 // filtro avançado de cache ativo, para dar chance a mais tokens de serem enriquecidos.
 async function enrichVisibleTop20(){
   const q=document.getElementById('search').value.trim().toUpperCase();
-  let list = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
+  let list;
 
-  // Filtra favoritos
-  if(showFavOnly) list = list.filter(d=>favorites.includes(d.symbol));
+  // Favoritos é pasta — filtra favoritos primeiro, depois aplica filtros avançados
+  if(showFavOnly){
+    list = allData.filter(d=>favorites.includes(d.symbol));
+    if(q) list = list.filter(d=>d.symbol.includes(q));
+    if(advFilters.volumeOp && advFilters.volumeVal!==''){
+      const mult = parseFloat(advFilters.volumeMult || 1000000);
+      const threshold = parseFloat(advFilters.volumeVal) * mult;
+      list = list.filter(d=>{
+        if(d.volume==null) return false;
+        if(advFilters.volumeOp==='gt') return d.volume > threshold;
+        if(advFilters.volumeOp==='lt') return d.volume < threshold;
+        return true;
+      });
+    }
+    if(advFilters.fundingOp && advFilters.fundingVal!==''){
+      const threshold = parseFloat(advFilters.fundingVal);
+      list = list.filter(d=>{
+        const v = getAvgFunding(d.symbol);
+        if(v==null) return false;
+        if(advFilters.fundingOp==='gt') return v > threshold;
+        if(advFilters.fundingOp==='lt') return v < threshold;
+        return true;
+      });
+    }
+  } else {
+    list = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
 
-  // Só aplica os filtros que NÃO dependem do cache de OI/LSR/CVD (volume e funding
-  // já estão disponíveis antes do enrich). Os demais (oiDir/lsrDir/cvdDir)
-  // dependem de dados que só existirão depois do enrichAll, então são ignorados aqui.
-  if(advFilters.volumeOp && advFilters.volumeVal!==''){
-    const mult = parseFloat(advFilters.volumeMult || 1000000);
-    const threshold = parseFloat(advFilters.volumeVal) * mult;
-    list = list.filter(d=>{
-      if(d.volume==null) return false;
-      if(advFilters.volumeOp==='gt') return d.volume > threshold;
-      if(advFilters.volumeOp==='lt') return d.volume < threshold;
-      return true;
-    });
-  }
-  if(advFilters.fundingOp && advFilters.fundingVal!==''){
-    const threshold = parseFloat(advFilters.fundingVal);
-    list = list.filter(d=>{
-      const v = getAvgFunding(d.symbol);
-      if(v==null) return false;
-      if(advFilters.fundingOp==='gt') return v > threshold;
-      if(advFilters.fundingOp==='lt') return v < threshold;
-      return true;
-    });
+    if(advFilters.volumeOp && advFilters.volumeVal!==''){
+      const mult = parseFloat(advFilters.volumeMult || 1000000);
+      const threshold = parseFloat(advFilters.volumeVal) * mult;
+      list = list.filter(d=>{
+        if(d.volume==null) return false;
+        if(advFilters.volumeOp==='gt') return d.volume > threshold;
+        if(advFilters.volumeOp==='lt') return d.volume < threshold;
+        return true;
+      });
+    }
+    if(advFilters.fundingOp && advFilters.fundingVal!==''){
+      const threshold = parseFloat(advFilters.fundingVal);
+      list = list.filter(d=>{
+        const v = getAvgFunding(d.symbol);
+        if(v==null) return false;
+        if(advFilters.fundingOp==='gt') return v > threshold;
+        if(advFilters.fundingOp==='lt') return v < threshold;
+        return true;
+      });
+    }
   }
 
   // Ordena igual ao render para priorizar os mesmos candidatos que tendem a aparecer na tela
@@ -1144,12 +1166,20 @@ function getVal(d, colId){
 
 function render(){
   const q=document.getElementById('search').value.trim().toUpperCase();
-  filteredData = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
-  // Aplica filtros avançados
-  // Filtra favoritos
-  if(showFavOnly) filteredData = filteredData.filter(d=>favorites.includes(d.symbol));
-  const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir;
-  if(hasAdvFilter) filteredData = filteredData.filter(d => passAdvFilter(d));
+  
+  // Favoritos é uma "pasta" — filtra só pelos favoritos primeiro
+  if(showFavOnly){
+    filteredData = allData.filter(d=>favorites.includes(d.symbol));
+    if(q) filteredData = filteredData.filter(d=>d.symbol.includes(q));
+    // Filtros avançados funcionam dentro dos favoritos
+    const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir;
+    if(hasAdvFilter) filteredData = filteredData.filter(d => passAdvFilter(d));
+  } else {
+    filteredData = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
+    // Aplica filtros avançados
+    const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir;
+    if(hasAdvFilter) filteredData = filteredData.filter(d => passAdvFilter(d));
+  }
 
   // Ordena
   filteredData.sort((a,b)=>{
@@ -1230,7 +1260,7 @@ function cell(id,d){
       cls = v>prev ? 'pos' : v<prev ? 'neg' : '';
     }
     const pct = (prev!=null && prev!==0) ? ((v-prev)/prev*100) : null;
-    const pctStr = pct!=null ? ` <span style="font-size:10px;opacity:.7">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
+    const pctStr = pct!=null ? `<br><span style="font-size:10px;opacity:.7;display:block;line-height:1.2">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
     return `<span class="num ${cls}">${fmtK(v)}</span>${pctStr}`;
   }
   if(id.startsWith('cvd_')){
@@ -1241,7 +1271,7 @@ function cell(id,d){
     let cls='';
     if(prev!=null) cls = v>prev ? 'pos' : v<prev ? 'neg' : '';
     const pct = (prev!=null && prev!==0) ? ((v-prev)/prev*100) : null;
-    const pctStr = pct!=null ? ` <span style="font-size:10px;opacity:.7">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
+    const pctStr = pct!=null ? `<br><span style="font-size:10px;opacity:.7;display:block;line-height:1.2">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
     return `<span class="num ${cls}">${fmtK(v)}</span>${pctStr}`;
   }
   if(id.startsWith('lsr_')){
@@ -1250,7 +1280,7 @@ function cell(id,d){
     const iv=id.replace('lsr_','');
     const prev=cache[`${d._sym}_lsr_${iv}_prev`];
     const pct = (prev!=null && prev!==0) ? ((v-prev)/prev*100) : null;
-    const pctStr = pct!=null ? ` <span style="font-size:10px;opacity:.7">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
+    const pctStr = pct!=null ? `<br><span style="font-size:10px;opacity:.7;display:block;line-height:1.2">${pct>0?'+':''}${pct.toFixed(2)}%</span>` : '';
     return `<span class="num ${v>=1?'pos':'neg'}">${fmt(v,3)}</span>${pctStr}`;
   }
   switch(id){
