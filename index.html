@@ -941,7 +941,9 @@ async function enrichVisibleTop20(){
   if(showFavOnly){
     list = allData.filter(d=>favorites.includes(d.symbol));
     if(q) list = list.filter(d=>d.symbol.includes(q));
-    if(advFilters.volumeOp && advFilters.volumeVal!==''){
+    // Com busca ativa, não aplica filtros de volume/funding — o token buscado deve
+    // ser enriquecido com dados independente de passar nesses filtros.
+    if(!q && advFilters.volumeOp && advFilters.volumeVal!==''){
       const mult = parseFloat(advFilters.volumeMult || 1000000);
       const threshold = parseFloat(advFilters.volumeVal) * mult;
       list = list.filter(d=>{
@@ -951,7 +953,7 @@ async function enrichVisibleTop20(){
         return true;
       });
     }
-    if(advFilters.fundingOp && advFilters.fundingVal!==''){
+    if(!q && advFilters.fundingOp && advFilters.fundingVal!==''){
       const threshold = parseFloat(advFilters.fundingVal);
       list = list.filter(d=>{
         const v = getAvgFunding(d.symbol);
@@ -964,7 +966,9 @@ async function enrichVisibleTop20(){
   } else {
     list = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
 
-    if(advFilters.volumeOp && advFilters.volumeVal!==''){
+    // Com busca ativa, não aplica filtros de volume/funding — o token buscado deve
+    // ser enriquecido com dados independente de passar nesses filtros.
+    if(!q && advFilters.volumeOp && advFilters.volumeVal!==''){
       const mult = parseFloat(advFilters.volumeMult || 1000000);
       const threshold = parseFloat(advFilters.volumeVal) * mult;
       list = list.filter(d=>{
@@ -974,7 +978,7 @@ async function enrichVisibleTop20(){
         return true;
       });
     }
-    if(advFilters.fundingOp && advFilters.fundingVal!==''){
+    if(!q && advFilters.fundingOp && advFilters.fundingVal!==''){
       const threshold = parseFloat(advFilters.fundingVal);
       list = list.filter(d=>{
         const v = getAvgFunding(d.symbol);
@@ -1171,14 +1175,17 @@ function render(){
   if(showFavOnly){
     filteredData = allData.filter(d=>favorites.includes(d.symbol));
     if(q) filteredData = filteredData.filter(d=>d.symbol.includes(q));
-    // Filtros avançados funcionam dentro dos favoritos
+    // Filtros avançados funcionam dentro dos favoritos — mas só quando não há busca ativa.
+    // Se o usuário está buscando um token especifico, ele quer encontra-lo independente
+    // de qualquer filtro estar ativo.
     const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir;
-    if(hasAdvFilter) filteredData = filteredData.filter(d => passAdvFilter(d));
+    if(hasAdvFilter && !q) filteredData = filteredData.filter(d => passAdvFilter(d));
   } else {
     filteredData = q ? allData.filter(d=>d.symbol.includes(q)) : [...allData];
-    // Aplica filtros avançados
+    // Aplica filtros avançados — apenas quando não há busca ativa. Com busca ativa, o
+    // token buscado deve aparecer independente dos filtros ligados.
     const hasAdvFilter = advFilters.volumeOp || advFilters.fundingOp || advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir;
-    if(hasAdvFilter) filteredData = filteredData.filter(d => passAdvFilter(d));
+    if(hasAdvFilter && !q) filteredData = filteredData.filter(d => passAdvFilter(d));
   }
 
   // Ordena
