@@ -806,12 +806,19 @@ async function enrichAll(top, ivs){
       const bbOi = bbOiRes[i];
       if(bbOi.status==='fulfilled' && bbOi.value?.result?.list?.length>0){
         const arr = bbOi.value.result.list; // Bybit retorna do mais recente pro mais antigo
-        const bbCur  = parseFloat(arr[0].openInterest);
-        const bbPrev = arr.length>=2 ? parseFloat(arr[1].openInterest) : null;
-        // Bybit OI é em contratos (USD), soma direto
-        oiCur  = (oiCur  ?? 0) + bbCur;
-        if(oiPrev!=null && bbPrev!=null) oiPrev = oiPrev + bbPrev;
-        else if(bbPrev!=null) oiPrev = bbPrev;
+        // Bybit retorna openInterest em quantidade de moeda base (ex: BTC), NÃO em USD.
+        // A Binance retorna sumOpenInterestValue já em USD. Pra somar os dois de forma
+        // consistente, convertemos o valor da Bybit pra USD usando o preço atual do token.
+        const price = t.price;
+        const bbCurRaw  = parseFloat(arr[0].openInterest);
+        const bbPrevRaw = arr.length>=2 ? parseFloat(arr[1].openInterest) : null;
+        if(price>0){
+          const bbCur  = bbCurRaw * price;
+          const bbPrev = bbPrevRaw!=null ? bbPrevRaw * price : null;
+          oiCur  = (oiCur  ?? 0) + bbCur;
+          if(oiPrev!=null && bbPrev!=null) oiPrev = oiPrev + bbPrev;
+          else if(bbPrev!=null) oiPrev = (oiPrev ?? 0) + bbPrev;
+        }
       }
 
       if(oiCur!=null){
@@ -844,17 +851,13 @@ async function enrichAll(top, ivs){
       }
     });
 
-    // ── CVD Spot: Binance + Bybit spot klines ──
+    // ── CVD Spot: Binance spot klines ──
+    // Bybit spot não expõe taker-buy separado no kline, então o CVD spot usa só a Binance.
     // Binance Spot klines: campo 7=quoteVol, campo 9=takerBuyQuoteVol
-    const [bnCvdRes, bbCvdRes, bnFutKlinesRes] = await Promise.all([
+    const [bnCvdRes, bnFutKlinesRes] = await Promise.all([
       Promise.allSettled(top.map(t=>{
         const sym = t.symbol.replace('USDT','');
         return fj(`https://api.binance.com/api/v3/klines?symbol=${sym}USDT&interval=${iv}&limit=21`);
-      })),
-      Promise.allSettled(top.map(t=>{
-        const sym = t.symbol.replace('USDT','');
-        // Bybit spot klines: startTime/endTime not needed, limit=2
-        return fj(`https://api.bybit.com/v5/market/kline?category=spot&symbol=${sym}USDT&interval=${bybitIVoi}&limit=2`);
       })),
       // Klines de futuros, usado como fonte alternativa de Volume Relativo
       // (cobre tokens sem par spot na Binance; CVD continua só com spot)
@@ -876,15 +879,6 @@ async function enrichAll(top, ivs){
         cvdCur  += calcDelta(arr[arr.length-1]);
         cvdPrev += arr.length>=2 ? calcDelta(arr[arr.length-2]) : 0;
         hasData = true;
-      }
-
-      // Bybit Spot CVD
-      const bbC = bbCvdRes[i];
-      if(bbC.status==='fulfilled' && bbC.value?.result?.list?.length>0){
-        const arr = bbC.value.result.list; // mais recente primeiro
-        // Bybit kline: [startTime, open, high, low, close, volume, turnover]
-        // Bybit spot não tem taker buy separado — pula
-        // (Bybit spot kline não tem taker buy field, só futures tem)
       }
 
       if(hasData){
@@ -1003,7 +997,7 @@ async function enrichVisibleTop20(){
   const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir);
   const limit = needsCacheFilter ? Math.min(list.length, 60) : 20;
 
-  const top = list.slice(0, limit).map(d=>({symbol:d._sym}));
+  const top = list.slice(0, limit).map(d=>({symbol:d._sym, price:d.price}));
   await enrichAll(top, activeIVs);
 }
 
@@ -1368,7 +1362,7 @@ async function toggleIV(id,btn){
     });
     const needsCacheFilter = !!(advFilters.oiDir || advFilters.lsrDir || advFilters.cvdDir || advFilters.latMode || advFilters.volrelDir);
     const limit = needsCacheFilter ? Math.min(list.length, 60) : 20;
-    const top20 = list.slice(0,limit).map(d=>({symbol:d._sym}));
+    const top20 = list.slice(0,limit).map(d=>({symbol:d._sym, price:d.price}));
     await enrichAll(top20,[id]);
   }
   saveC(); render();
@@ -1833,6 +1827,25 @@ function saveAlert(){
     alerts.push({id:Date.now().toString(), name, token, conditions, active:true, lastTriggered:null});
   }
   saveAlerts(); closeModal(); renderAlertList();
+
+  // Um alerta só recebe dados pros timeframes que estiverem ativos no scanner (5m/15m/1h/4h/1D).
+  // Se a condição usa um timeframe que não está ativo, ele nunca teria dado pra avaliar e o
+  // alerta nunca dispararia, sem nenhum aviso. Por isso, ativamos automaticamente qualquer
+  // timeframe referenciado que ainda não esteja ligado.
+  const ALL_IVS = ['5m','15m','1h','4h','1d'];
+  const neededIvs = new Set();
+  conditions.forEach(c=>{
+    const iv = ALL_IVS.find(iv=>c.col.endsWith('_'+iv));
+    if(iv) neededIvs.add(iv);
+  });
+  const newlyActivated = [...neededIvs].filter(iv=>!activeIVs.includes(iv));
+  if(newlyActivated.length>0){
+    newlyActivated.forEach(iv=>activeIVs.push(iv));
+    saveC();
+    buildIVToggles();
+    alert('Este alerta usa o(s) timeframe(s) ' + newlyActivated.join(', ') + ', que não estava(m) ativo(s) no scanner. Ativei automaticamente pra o alerta poder funcionar.');
+    enrichVisibleTop20().then(()=>render());
+  }
 }
 
 function deleteAlert(id){ alerts=alerts.filter(a=>a.id!==id); saveAlerts(); renderAlertList(); }
